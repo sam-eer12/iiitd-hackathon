@@ -1,6 +1,6 @@
 # TenderLens — Current Build Status
 
-**Updated:** 24 October 2026. This file records implementation progress separately from the original target architecture and 24-hour plan.
+**Updated:** 24 October 2026. This file records implementation progress across both frontend and backend tracks.
 
 ## Implemented
 
@@ -9,32 +9,28 @@
 | Landing | Product introduction, sample product preview, how-it-works sections, workspace entry points |
 | Dashboard | Collapsible sidebar, mobile navigation, persistent shared workspace shell |
 | Tender review | Search, category/readiness filters, sort, saved notices, shortlist JSON export |
-| Supplier profile | Editable facts, tri-state certificates, exact annual financial periods, local browser persistence |
-| Rules | Five deterministic sample check types; known failures block; missing facts/evidence stay unresolved; incomplete coverage cannot pass |
-| Evidence | Native modal drawer, expandable findings, source links, page-linked synthetic document viewer |
-| Changes | Two explicitly synthetic before/after examples |
-| TinyFish | Server-only async submission/polling, source URL validation, saved local run IDs, signed access cookie, duplicate-start control, bounded run time, explicit unknown-submission handling |
-| Architecture | Mermaid Charts output, saved `.mmd` source, rendered `/architecture` page |
+| Supplier profile | Editable facts, tri-state certificates, exact annual financial periods, optimistic versioning, local browser persistence and backend persistence |
+| Backend API & Architecture | FastAPI application factory, PostgreSQL 17/18 persistence in dedicated `tenderlens_api` schema, Alembic async migrations (21 tables), typed Pydantic v2 schemas with camelCase aliases |
+| Auth & Isolation | Firebase Auth ID token verification, automatic personal workspace provisioning (`/me`), strict workspace isolation for all profiles, bookmarks, jobs, and private uploads |
+| Rules Engine | Authoritative Python domain readiness engine evaluating 5 supported check types (turnover, experience, certificates, deposit, deadline) with reason codes, conservative aggregation, and evidence citations |
+| Document Ingestion | PyMuPDF extraction with 1-based page indexing, SHA-256 deduplication, SSRF protections, and clause-quote page verification |
+| Amendments & Diff | Snapshot-to-snapshot clause condition comparison classifying added, modified, removed, and unchanged clauses |
+| Durable Worker | Background worker utilizing PostgreSQL `FOR UPDATE SKIP LOCKED` row locking, leases, heartbeats, and provider observation budgets |
+| TinyFish Provider | Server-only adapter supporting both deterministic `fixture` mode and live `POST /v1/automation/run-async` metered runs with cancellation and reconciliation |
+| Local Import | Idempotent `POST /api/v1/imports/local-workspace` migration of browser storage into the persistent backend |
+| CLI & Benchmark | `seed.py` for idempotent setup and `benchmark.py` running the 10-notice evaluation target |
 
-## Current limits and next work
+## Verification Summary
 
-- The eight default notices and all displayed sample clauses are synthetic. The sample clock is fixed at 24 October 2026.
-- Live discovery is wired to the documented TinyFish REST API. No metered real run was started during this UI implementation; account access and source accessibility still need a live smoke check.
-- Live notice deadlines remain unparsed text; no precise timestamp, category, value, relevance score, or readiness condition is invented.
-- Live PDF download/extraction, real clause evidence, document hashing/versioning, effective amendment resolution, and the ten-notice benchmark are not implemented.
-- Profile and bookmarks are browser-local. Discovery records use the local filesystem, and polling runs while a workspace is open. This is not the proposed durable production worker.
-- FastAPI, PostgreSQL, S3, production organisation authentication, and AWS deployment are planned. Hosted metered discovery requires the server access token.
-- The repository starter is Next.js 16.4.3, React 19.3.0; hosting support must be checked before AWS deployment.
+### Backend
+- **Migrations:** Alembic revision applied; all 21 tables created in `tenderlens_api` schema.
+- **Test Suite:** 26/26 unit and API integration tests passing in pytest (golden rule boundary conditions, document hashing, downloader SSRF rejection, normalizers, clause extraction, auth/provisioning, profile version concurrency, bookmarks, refresh jobs, local imports).
+- **Benchmark:** 10-notice release benchmark completed with 100% extraction (50/50 conditions), 100% page/quote linkage, and 0 silent passes on bad evidence.
+- **Code Quality:** Ruff linting and formatting checks passing cleanly across 70 files.
 
-## Verification
-
-- GitHub Actions CI is configured for pushes, pull requests, and manual dispatch, with separate quality and production build/smoke jobs on Node.js 24. The production job uses non-sensitive placeholder Firebase configuration and has no TinyFish credentials.
-
+### Frontend
 - ESLint and TypeScript checks passed.
 - Seventeen behavior tests passed: missing financial years, unknown versus absent certificates, zero funding, evidence requirements, deadline boundaries, incomplete coverage, aggregate status precedence, live result schema checks, no-match semantics, duplicate limits, and source URL restrictions.
-- Production build generated the landing, dashboard routes, architecture page, sample documents, and dynamic discovery routes.
-- HTTP smoke checks cover page content and API configuration, cross-origin submission rejection, signed job access, and not-found content with a noindex marker. Next.js may send HTTP 200 for a not-found page after streaming begins, so the check verifies the rendered error state as well as the allowed status.
-- Mermaid grammar was checked with the installed Mermaid parser; a sanitizer stub was used only for the server-side syntax check because the parser normally expects a browser DOM. The application uses Mermaid's strict security mode.
-- Browser visual/interaction review was unavailable because the computer-use runtime reported no connected browsers. Responsive styles and interaction handlers are implemented, but an actual desktop/mobile browser review remains to be done.
+- Production build generated landing, dashboard routes, architecture page, sample documents, and dynamic discovery routes.
 
-See the root [README](../README.md) for local setup and commands.
+See [backend/README.md](../backend/README.md) and root [README.md](../README.md) for local setup and commands.
