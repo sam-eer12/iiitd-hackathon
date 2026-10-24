@@ -1,0 +1,25 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/tenderlens/release
+file_exists_behavior: OVERWRITE
+permissions:
+  - object: /opt/tenderlens/release/scripts
+    pattern: '*.sh'
+    mode: '755'
+    type:
+      - file
+hooks:
+  BeforeInstall:
+    - location: scripts/prepare.sh
+      timeout: 180
+      runas: root
+  ApplicationStart:
+    - location: scripts/start.sh
+      timeout: 900
+      runas: root
+  ValidateService:
+    - location: scripts/validate.sh
+      timeout: 180
+      runas: root

@@ -1,0 +1,41 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - docker info
+  pre_build:
+    commands:
+      - export RELEASE_TAG="$CODEBUILD_RESOLVED_SOURCE_VERSION-$CODEBUILD_BUILD_NUMBER"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${BACKEND_REPOSITORY%%/*}"
+      - docker network create tenderlens-ci
+      - docker run -d --name postgres --network tenderlens-ci -e POSTGRES_USER=tenderlens -e POSTGRES_PASSWORD=tenderlens_ci -e POSTGRES_DB=tenderlens postgres:18-alpine
+      - for attempt in $(seq 1 60); do docker exec postgres pg_isready -U tenderlens && break; sleep 1; done
+      - docker exec postgres pg_isready -U tenderlens
+  build:
+    commands:
+      - docker build --target test -t backend-test backend
+      - docker run --rm --network tenderlens-ci -e APP_ENV=test -e DATABASE_URL=postgresql+asyncpg://tenderlens:tenderlens_ci@postgres:5432/tenderlens backend-test sh -ec 'uv run ruff check app tests migrations; uv run ruff format --check app tests migrations; uv run alembic upgrade head; uv run python -m app.cli.seed; uv run pytest -q; uv run python -m app.cli.benchmark'
+      - docker build --target quality -t frontend-test -f backend/deploy/frontend.Dockerfile frontend
+      - docker run --rm frontend-test
+      - docker build --target runtime -t "$BACKEND_REPOSITORY:$RELEASE_TAG" backend
+      - docker build --target runtime -t "$FRONTEND_REPOSITORY:$RELEASE_TAG" -f backend/deploy/frontend.Dockerfile frontend
+      - docker run -d --name api --network tenderlens-ci -e APP_ENV=test -e DATABASE_URL=postgresql+asyncpg://tenderlens:tenderlens_ci@postgres:5432/tenderlens "$BACKEND_REPOSITORY:$RELEASE_TAG"
+      - docker run -d --name web --network tenderlens-ci -e TENDERLENS_API_URL=http://api:8000 -e TENDERLENS_REMOTE_WORKSPACE=true "$FRONTEND_REPOSITORY:$RELEASE_TAG"
+      - docker run --rm --network tenderlens-ci --entrypoint node -e SMOKE_BASE_URL=http://web:3000 frontend-test scripts/wait-for-server.mjs
+      - docker run --rm --network tenderlens-ci --entrypoint node -e SMOKE_BASE_URL=http://web:3000 frontend-test scripts/smoke.mjs
+      - docker push "$BACKEND_REPOSITORY:$RELEASE_TAG"
+      - docker push "$FRONTEND_REPOSITORY:$RELEASE_TAG"
+      - mkdir -p release/scripts release/vendor
+      - cp backend/deploy/appspec.yml release/appspec.yml
+      - cp backend/deploy/scripts/* release/scripts/
+      - cp backend/deploy/vendor/asm-exec release/vendor/
+      - chmod +x release/scripts/*.sh release/vendor/asm-exec
+      - python3 backend/deploy/scripts/release.py
+  post_build:
+    commands:
+      - docker rm -f web api postgres || true
+      - docker network rm tenderlens-ci || true
+artifacts:
+  base-directory: release
+  files:
+    - '**/*'

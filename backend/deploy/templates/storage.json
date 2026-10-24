@@ -1,0 +1,426 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "TenderLens retained storage - encrypted buckets, images, keys and provider configuration",
+  "Metadata": {
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    }
+  },
+  "Parameters": {
+    "DatabaseIdentifier": {
+      "Type": "String",
+      "Default": "tenderlens-data-postgres",
+      "AllowedPattern": "[a-z][a-z0-9-]{0,62}"
+    }
+  },
+  "Resources": {
+    "DataKey": {
+      "Type": "AWS::KMS::Key",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Customer-managed encryption for data, artifacts and database logs",
+          "must": [
+            "Retain key while retained data exists"
+          ]
+        }
+      },
+      "Properties": {
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "kms:*",
+              "Resource": "*",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                }
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*",
+              "Principal": {
+                "Service": {
+                  "Fn::Sub": "logs.${AWS::Region}.amazonaws.com"
+                }
+              },
+              "Condition": {
+                "ArnLike": {
+                  "kms:EncryptionContext:aws:logs:arn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "EvidenceBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Private encrypted durable storage",
+          "must": [
+            "Retain data on stack removal",
+            "Block public access"
+          ]
+        }
+      },
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms",
+                "KMSMasterKeyID": {
+                  "Fn::GetAtt": [
+                    "DataKey",
+                    "Arn"
+                  ]
+                }
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "EvidenceBucketTLS": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Reject cleartext object access",
+          "must": [
+            "Keep the TLS deny policy"
+          ]
+        }
+      },
+      "Properties": {
+        "Bucket": {
+          "Ref": "EvidenceBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "EvidenceBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${EvidenceBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ArtifactBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Private encrypted durable storage",
+          "must": [
+            "Retain data on stack removal",
+            "Block public access"
+          ]
+        }
+      },
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms",
+                "KMSMasterKeyID": {
+                  "Fn::GetAtt": [
+                    "DataKey",
+                    "Arn"
+                  ]
+                }
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ArtifactBucketTLS": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Reject cleartext object access",
+          "must": [
+            "Keep the TLS deny policy"
+          ]
+        }
+      },
+      "Properties": {
+        "Bucket": {
+          "Ref": "ArtifactBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ArtifactBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${ArtifactBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackendRepository": {
+      "Type": "AWS::ECR::Repository",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Immutable release images; retained for rollback",
+          "must": []
+        }
+      },
+      "Properties": {
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "KMS",
+          "KmsKey": {
+            "Fn::GetAtt": [
+              "DataKey",
+              "Arn"
+            ]
+          }
+        },
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": "{\"rules\": [{\"rulePriority\": 1, \"description\": \"Expire untagged build layers after 7 days\", \"selection\": {\"tagStatus\": \"untagged\", \"countType\": \"sinceImagePushed\", \"countUnit\": \"days\", \"countNumber\": 7}, \"action\": {\"type\": \"expire\"}}]}"
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "FrontendRepository": {
+      "Type": "AWS::ECR::Repository",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Immutable release images; retained for rollback",
+          "must": []
+        }
+      },
+      "Properties": {
+        "ImageTagMutability": "IMMUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "EncryptionConfiguration": {
+          "EncryptionType": "KMS",
+          "KmsKey": {
+            "Fn::GetAtt": [
+              "DataKey",
+              "Arn"
+            ]
+          }
+        },
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": "{\"rules\": [{\"rulePriority\": 1, \"description\": \"Expire untagged build layers after 7 days\", \"selection\": {\"tagStatus\": \"untagged\", \"countType\": \"sinceImagePushed\", \"countUnit\": \"days\", \"countNumber\": 7}, \"action\": {\"type\": \"expire\"}}]}"
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "IntegrationSecret": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "No provider keys in source, build logs or CloudFormation parameters",
+          "must": [
+            "Resolve only at runtime through asm-exec",
+            "Empty keys keep metered providers disabled"
+          ]
+        }
+      },
+      "Properties": {
+        "KmsKeyId": {
+          "Fn::GetAtt": [
+            "DataKey",
+            "Arn"
+          ]
+        },
+        "Description": "Server-side provider configuration; populate through Secrets Manager console",
+        "GenerateSecretString": {
+          "SecretStringTemplate": "{\"TINYFISH_API_KEY\": \"\", \"SANDBOX_API_KEY\": \"\", \"SANDBOX_API_SECRET\": \"\"}",
+          "GenerateStringKey": "bootstrapNonce",
+          "PasswordLength": 32
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "DatabaseLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Encrypted PostgreSQL security and error logs",
+          "must": []
+        }
+      },
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/rds/instance/${DatabaseIdentifier}/postgresql"
+        },
+        "KmsKeyId": {
+          "Fn::GetAtt": [
+            "DataKey",
+            "Arn"
+          ]
+        },
+        "RetentionInDays": 30
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    }
+  },
+  "Outputs": {
+    "EvidenceBucket": {
+      "Value": {
+        "Ref": "EvidenceBucket"
+      },
+      "Description": "EvidenceBucket identifier"
+    },
+    "ArtifactBucket": {
+      "Value": {
+        "Ref": "ArtifactBucket"
+      },
+      "Description": "ArtifactBucket identifier"
+    },
+    "IntegrationSecret": {
+      "Value": {
+        "Ref": "IntegrationSecret"
+      },
+      "Description": "IntegrationSecret identifier"
+    },
+    "DataKeyArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "DataKey",
+          "Arn"
+        ]
+      },
+      "Description": "DataKeyArn for the service stack"
+    },
+    "BackendRepositoryUri": {
+      "Value": {
+        "Fn::GetAtt": [
+          "BackendRepository",
+          "RepositoryUri"
+        ]
+      },
+      "Description": "BackendRepositoryUri for the service stack"
+    },
+    "FrontendRepositoryUri": {
+      "Value": {
+        "Fn::GetAtt": [
+          "FrontendRepository",
+          "RepositoryUri"
+        ]
+      },
+      "Description": "FrontendRepositoryUri for the service stack"
+    },
+    "BackendRepositoryArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "BackendRepository",
+          "Arn"
+        ]
+      },
+      "Description": "BackendRepositoryArn for the service stack"
+    },
+    "FrontendRepositoryArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "FrontendRepository",
+          "Arn"
+        ]
+      },
+      "Description": "FrontendRepositoryArn for the service stack"
+    }
+  }
+}

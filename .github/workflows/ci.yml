@@ -25,7 +25,7 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: tenderlens
           POSTGRES_PASSWORD: tenderlens_dev
@@ -174,3 +174,29 @@ jobs:
           cat "$server_log"
           echo "Production server did not become ready within 60 seconds."
           exit 1
+
+  infrastructure:
+    name: AWS infrastructure validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Render infrastructure
+        run: |
+          python deploy/render.py
+          git diff --exit-code -- deploy/templates
+      - name: Validate CloudFormation resource schemas
+        run: uv tool run --from cfn-lint==1.58.0 cfn-lint --format json --regions ap-south-1 --template deploy/templates/storage.json deploy/templates/data.json deploy/templates/service.json
+      - name: Check deployment security invariants
+        run: uv run --no-project --with guardpycfn==0.1.0 python deploy/check_guard.py

@@ -1,0 +1,53 @@
+# Critical project invariants. This is not a certification against every AWS rule.
+let buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
+rule private_encrypted_versioned_buckets when %buckets !empty {
+  %buckets {
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+    Properties {
+      PublicAccessBlockConfiguration {
+        BlockPublicAcls == true
+        BlockPublicPolicy == true
+        IgnorePublicAcls == true
+        RestrictPublicBuckets == true
+      }
+      BucketEncryption exists
+      VersioningConfiguration.Status == 'Enabled'
+    }
+  }
+}
+let databases = Resources.*[ Type == 'AWS::RDS::DBInstance' ]
+rule private_resilient_postgres when %databases !empty {
+  %databases {
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+    Properties {
+      Engine == 'postgres'
+      StorageEncrypted == true
+      KmsKeyId exists
+      MultiAZ == { "Fn::If": ["Production", true, false] }
+      PubliclyAccessible == false
+      ManageMasterUserPassword == true
+      MasterUserPassword !exists
+      EnableIAMDatabaseAuthentication == true
+      BackupRetentionPeriod == { "Fn::If": ["Production", 7, 1] }
+      DeletionProtection == true
+    }
+  }
+}
+let launches = Resources.*[ Type == 'AWS::EC2::LaunchTemplate' ]
+rule encrypted_imdsv2_hosts when %launches !empty {
+  %launches.Properties.LaunchTemplateData {
+    KeyName !exists
+    MetadataOptions.HttpTokens == 'required'
+    BlockDeviceMappings.*.Ebs.Encrypted == true
+  }
+}
+let pipelines = Resources.*[ Type == 'AWS::CodePipeline::Pipeline' ]
+rule ordered_pipeline when %pipelines !empty {
+  %pipelines.Properties {
+    PipelineType == 'V2'
+    ExecutionMode == 'QUEUED'
+    ArtifactStore.EncryptionKey exists
+  }
+}
