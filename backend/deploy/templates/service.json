@@ -194,6 +194,15 @@
                 {
                   "Effect": "Allow",
                   "Action": [
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${ArtifactBucket}/bootstrap/current.tar.gz"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
                     "s3:ListBucket"
                   ],
                   "Resource": {
@@ -472,7 +481,7 @@
           ],
           "UserData": {
             "Fn::Base64": {
-              "Fn::Sub": "#!/bin/bash\nset -euo pipefail\ndnf install -y docker ruby wget python3\naws --version\nsystemctl enable --now docker\nmkdir -p /opt/tenderlens /etc/tenderlens\ncat > /etc/tenderlens/runtime.json <<'CONFIG'\n{\"region\":\"${AWS::Region}\",\"databaseHost\":\"${DatabaseHost}\",\"databaseSecret\":\"${DatabaseSecretArn}\",\"integrationSecret\":\"${IntegrationSecret}\",\"evidenceBucket\":\"${EvidenceBucket}\",\"logGroup\":\"${Logs}\",\"backendRepository\":\"${BackendRepositoryUri}\",\"frontendRepository\":\"${FrontendRepositoryUri}\"}\nCONFIG\nchmod 600 /etc/tenderlens/runtime.json\ncd /tmp\nwget -q https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install -O codedeploy-install\nchmod +x codedeploy-install\n./codedeploy-install auto\nsystemctl enable --now codedeploy-agent\n"
+              "Fn::Sub": "#!/bin/bash\nset -euo pipefail\ndnf install -y docker python3\naws --version\nsystemctl enable --now docker\nmkdir -p /opt/tenderlens /etc/tenderlens\ncat > /etc/tenderlens/runtime.json <<'CONFIG'\n{\"region\":\"${AWS::Region}\",\"databaseHost\":\"${DatabaseHost}\",\"databaseSecret\":\"${DatabaseSecretArn}\",\"integrationSecret\":\"${IntegrationSecret}\",\"evidenceBucket\":\"${EvidenceBucket}\",\"logGroup\":\"${Logs}\",\"backendRepository\":\"${BackendRepositoryUri}\",\"frontendRepository\":\"${FrontendRepositoryUri}\",\"artifactBucket\":\"${ArtifactBucket}\"}\nCONFIG\nchmod 600 /etc/tenderlens/runtime.json\nsystemctl enable --now amazon-ssm-agent\nif aws s3 cp s3://${ArtifactBucket}/bootstrap/current.tar.gz /opt/tenderlens/current.tar.gz --only-show-errors; then\n  mkdir -p /opt/tenderlens/incoming\n  tar -xzf /opt/tenderlens/current.tar.gz -C /opt/tenderlens/incoming\n  cd /opt/tenderlens/incoming\n  bash scripts/deploy.sh\nfi\n"
             }
           }
         }
@@ -522,6 +531,13 @@
           {
             "Key": "Project",
             "Value": "TenderLens",
+            "PropagateAtLaunch": true
+          },
+          {
+            "Key": "DeploymentStack",
+            "Value": {
+              "Ref": "AWS::StackName"
+            },
             "PropagateAtLaunch": true
           }
         ]
@@ -613,125 +629,6 @@
             "CloudFrontDefaultCertificate": true
           },
           "PriceClass": "PriceClass_200"
-        }
-      }
-    },
-    "DeployRole": {
-      "Type": "AWS::IAM::Role",
-      "Metadata": {
-        "com.aws.cloudformation.Context": {
-          "why": "Service-specific permissions for this deployment",
-          "must": [
-            "Scope data access to project resources"
-          ]
-        }
-      },
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "codedeploy.amazonaws.com"
-              },
-              "Action": "sts:AssumeRole"
-            }
-          ]
-        },
-        "ManagedPolicyArns": [
-          {
-            "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSCodeDeployRole"
-          }
-        ],
-        "Policies": [
-          {
-            "PolicyName": "project-access",
-            "PolicyDocument": {
-              "Version": "2012-10-17",
-              "Statement": []
-            }
-          }
-        ]
-      }
-    },
-    "DeployApplication": {
-      "Type": "AWS::CodeDeploy::Application",
-      "Metadata": {
-        "com.aws.cloudformation.Context": {
-          "why": "Native deployment lifecycle and rollback",
-          "must": []
-        }
-      },
-      "Properties": {
-        "ComputePlatform": "Server"
-      }
-    },
-    "DeployConfig": {
-      "Type": "AWS::CodeDeploy::DeploymentConfig",
-      "Metadata": {
-        "com.aws.cloudformation.Context": {
-          "why": "Single-host in-place rollout permits brief downtime; health failure rolls back",
-          "must": []
-        }
-      },
-      "Properties": {
-        "ComputePlatform": "Server",
-        "MinimumHealthyHosts": {
-          "Type": "HOST_COUNT",
-          "Value": 0
-        }
-      }
-    },
-    "DeployGroup": {
-      "Type": "AWS::CodeDeploy::DeploymentGroup",
-      "Metadata": {
-        "com.aws.cloudformation.Context": {
-          "why": "Drain load balancer traffic, install immutable images, validate and roll back failures",
-          "must": []
-        }
-      },
-      "Properties": {
-        "ApplicationName": {
-          "Ref": "DeployApplication"
-        },
-        "ServiceRoleArn": {
-          "Fn::GetAtt": [
-            "DeployRole",
-            "Arn"
-          ]
-        },
-        "AutoScalingGroups": [
-          {
-            "Ref": "Hosts"
-          }
-        ],
-        "DeploymentConfigName": {
-          "Ref": "DeployConfig"
-        },
-        "DeploymentStyle": {
-          "DeploymentType": "IN_PLACE",
-          "DeploymentOption": "WITH_TRAFFIC_CONTROL"
-        },
-        "LoadBalancerInfo": {
-          "TargetGroupInfoList": [
-            {
-              "Name": {
-                "Fn::GetAtt": [
-                  "Targets",
-                  "TargetGroupName"
-                ]
-              }
-            }
-          ]
-        },
-        "AutoRollbackConfiguration": {
-          "Enabled": true,
-          "Events": [
-            "DEPLOYMENT_FAILURE",
-            "DEPLOYMENT_STOP_ON_ALARM",
-            "DEPLOYMENT_STOP_ON_REQUEST"
-          ]
         }
       }
     },
@@ -910,6 +807,26 @@
         }
       }
     },
+    "PipelineLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Encrypted EC2 deployment execution logs",
+          "must": []
+        }
+      },
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codepipeline/${AWS::StackName}-pipeline"
+        },
+        "KmsKeyId": {
+          "Ref": "DataKeyArn"
+        },
+        "RetentionInDays": 30
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
     "PipelineRole": {
       "Type": "AWS::IAM::Role",
       "Metadata": {
@@ -1018,23 +935,64 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "codedeploy:CreateDeployment",
-                    "codedeploy:GetDeployment",
-                    "codedeploy:GetDeploymentConfig",
-                    "codedeploy:RegisterApplicationRevision",
-                    "codedeploy:GetApplicationRevision"
+                    "ec2:DescribeInstances",
+                    "elasticloadbalancing:DescribeTargetGroupAttributes",
+                    "elasticloadbalancing:DescribeTargetGroups",
+                    "elasticloadbalancing:DescribeTargetHealth",
+                    "ssm:CancelCommand",
+                    "ssm:DescribeInstanceInformation",
+                    "ssm:ListCommandInvocations"
                   ],
-                  "Resource": [
-                    {
-                      "Fn::Sub": "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${DeployApplication}"
-                    },
-                    {
-                      "Fn::Sub": "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentgroup:${DeployApplication}/${DeployGroup}"
-                    },
-                    {
-                      "Fn::Sub": "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentconfig:${DeployConfig}"
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:DeregisterTargets",
+                    "elasticloadbalancing:RegisterTargets"
+                  ],
+                  "Resource": {
+                    "Ref": "Targets"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ssm:SendCommand"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:ResourceTag/DeploymentStack": {
+                        "Ref": "AWS::StackName"
+                      }
                     }
-                  ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ssm:SendCommand"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "PipelineLogs",
+                      "Arn"
+                    ]
+                  }
                 }
               ]
             }
@@ -1053,6 +1011,9 @@
         }
       },
       "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-pipeline"
+        },
         "RoleArn": {
           "Fn::GetAtt": [
             "PipelineRole",
@@ -1143,16 +1104,25 @@
                 "ActionTypeId": {
                   "Category": "Deploy",
                   "Owner": "AWS",
-                  "Provider": "CodeDeploy",
+                  "Provider": "EC2",
                   "Version": "1"
                 },
                 "Configuration": {
-                  "ApplicationName": {
-                    "Ref": "DeployApplication"
+                  "InstanceTagKey": "DeploymentStack",
+                  "InstanceTagValue": {
+                    "Ref": "AWS::StackName"
                   },
-                  "DeploymentGroupName": {
-                    "Ref": "DeployGroup"
-                  }
+                  "InstanceType": "EC2",
+                  "TargetDirectory": "/opt/tenderlens/incoming",
+                  "PostScript": "scripts/deploy.sh",
+                  "TargetGroupNameList": {
+                    "Fn::GetAtt": [
+                      "Targets",
+                      "TargetGroupName"
+                    ]
+                  },
+                  "MaxBatch": "1",
+                  "MaxError": "0"
                 },
                 "InputArtifacts": [
                   {

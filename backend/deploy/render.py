@@ -527,6 +527,10 @@ def service():
                 [R("BackendRepositoryArn"), R("FrontendRepositoryArn")],
             ),
             statement(["s3:GetObject"], S("arn:${AWS::Partition}:s3:::${ArtifactBucket}/*")),
+            statement(
+                ["s3:PutObject"],
+                S("arn:${AWS::Partition}:s3:::${ArtifactBucket}/bootstrap/current.tar.gz"),
+            ),
             statement(["s3:ListBucket"], S("arn:${AWS::Partition}:s3:::${EvidenceBucket}")),
             statement(
                 ["s3:GetObject", "s3:PutObject"],
@@ -637,19 +641,21 @@ def service():
     )
     userdata = """#!/bin/bash
 set -euo pipefail
-dnf install -y docker ruby wget python3
+dnf install -y docker python3
 aws --version
 systemctl enable --now docker
 mkdir -p /opt/tenderlens /etc/tenderlens
 cat > /etc/tenderlens/runtime.json <<'CONFIG'
-{"region":"${AWS::Region}","databaseHost":"${DatabaseHost}","databaseSecret":"${DatabaseSecretArn}","integrationSecret":"${IntegrationSecret}","evidenceBucket":"${EvidenceBucket}","logGroup":"${Logs}","backendRepository":"${BackendRepositoryUri}","frontendRepository":"${FrontendRepositoryUri}"}
+{"region":"${AWS::Region}","databaseHost":"${DatabaseHost}","databaseSecret":"${DatabaseSecretArn}","integrationSecret":"${IntegrationSecret}","evidenceBucket":"${EvidenceBucket}","logGroup":"${Logs}","backendRepository":"${BackendRepositoryUri}","frontendRepository":"${FrontendRepositoryUri}","artifactBucket":"${ArtifactBucket}"}
 CONFIG
 chmod 600 /etc/tenderlens/runtime.json
-cd /tmp
-wget -q https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install -O codedeploy-install
-chmod +x codedeploy-install
-./codedeploy-install auto
-systemctl enable --now codedeploy-agent
+systemctl enable --now amazon-ssm-agent
+if aws s3 cp s3://${ArtifactBucket}/bootstrap/current.tar.gz /opt/tenderlens/current.tar.gz --only-show-errors; then
+  mkdir -p /opt/tenderlens/incoming
+  tar -xzf /opt/tenderlens/current.tar.gz -C /opt/tenderlens/incoming
+  cd /opt/tenderlens/incoming
+  bash scripts/deploy.sh
+fi
 """
     resource(
         t,
@@ -706,7 +712,10 @@ systemctl enable --now codedeploy-agent
             "TargetGroupARNs": [R("Targets")],
             "HealthCheckType": "EC2",
             "HealthCheckGracePeriod": 900,
-            "Tags": [{"Key": "Project", "Value": "TenderLens", "PropagateAtLaunch": True}],
+            "Tags": [
+                {"Key": "Project", "Value": "TenderLens", "PropagateAtLaunch": True},
+                {"Key": "DeploymentStack", "Value": R("AWS::StackName"), "PropagateAtLaunch": True},
+            ],
         },
         "One recoverable host initially; capacity can grow after load testing",
         ["Persistent application data lives in RDS/S3, not instance disk"],
@@ -762,54 +771,6 @@ systemctl enable --now codedeploy-agent
         },
         "Managed HTTPS endpoint without requiring a custom domain; Next.js handles caching",
         ["Never cache authenticated responses", "Forward viewer Host for same-origin checks"],
-    )
-    role(
-        t,
-        "DeployRole",
-        "codedeploy.amazonaws.com",
-        [],
-        managed=[S("arn:${AWS::Partition}:iam::aws:policy/service-role/AWSCodeDeployRole")],
-    )
-    resource(
-        t,
-        "DeployApplication",
-        "CodeDeploy::Application",
-        {"ComputePlatform": "Server"},
-        "Native deployment lifecycle and rollback",
-    )
-    resource(
-        t,
-        "DeployConfig",
-        "CodeDeploy::DeploymentConfig",
-        {"ComputePlatform": "Server", "MinimumHealthyHosts": {"Type": "HOST_COUNT", "Value": 0}},
-        "Single-host in-place rollout permits brief downtime; health failure rolls back",
-    )
-    resource(
-        t,
-        "DeployGroup",
-        "CodeDeploy::DeploymentGroup",
-        {
-            "ApplicationName": R("DeployApplication"),
-            "ServiceRoleArn": A("DeployRole", "Arn"),
-            "AutoScalingGroups": [R("Hosts")],
-            "DeploymentConfigName": R("DeployConfig"),
-            "DeploymentStyle": {
-                "DeploymentType": "IN_PLACE",
-                "DeploymentOption": "WITH_TRAFFIC_CONTROL",
-            },
-            "LoadBalancerInfo": {
-                "TargetGroupInfoList": [{"Name": A("Targets", "TargetGroupName")}]
-            },
-            "AutoRollbackConfiguration": {
-                "Enabled": True,
-                "Events": [
-                    "DEPLOYMENT_FAILURE",
-                    "DEPLOYMENT_STOP_ON_ALARM",
-                    "DEPLOYMENT_STOP_ON_REQUEST",
-                ],
-            },
-        },
-        "Drain load balancer traffic, install immutable images, validate and roll back failures",
     )
     role(
         t,
@@ -881,6 +842,18 @@ systemctl enable --now codedeploy-agent
             "Never pass provider keys as Docker build arguments",
         ],
     )
+    resource(
+        t,
+        "PipelineLogs",
+        "Logs::LogGroup",
+        {
+            "LogGroupName": S("/aws/codepipeline/${AWS::StackName}-pipeline"),
+            "KmsKeyId": R("DataKeyArn"),
+            "RetentionInDays": 30,
+        },
+        "Encrypted EC2 deployment execution logs",
+        retain=True,
+    )
     role(
         t,
         "PipelineRole",
@@ -919,23 +892,34 @@ systemctl enable --now codedeploy-agent
             statement(["codebuild:StartBuild", "codebuild:BatchGetBuilds"], A("Build", "Arn")),
             statement(
                 [
-                    "codedeploy:CreateDeployment",
-                    "codedeploy:GetDeployment",
-                    "codedeploy:GetDeploymentConfig",
-                    "codedeploy:RegisterApplicationRevision",
-                    "codedeploy:GetApplicationRevision",
+                    "ec2:DescribeInstances",
+                    "elasticloadbalancing:DescribeTargetGroupAttributes",
+                    "elasticloadbalancing:DescribeTargetGroups",
+                    "elasticloadbalancing:DescribeTargetHealth",
+                    "ssm:CancelCommand",
+                    "ssm:DescribeInstanceInformation",
+                    "ssm:ListCommandInvocations",
                 ],
-                [
-                    S(
-                        "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:application:${DeployApplication}"
-                    ),
-                    S(
-                        "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentgroup:${DeployApplication}/${DeployGroup}"
-                    ),
-                    S(
-                        "arn:${AWS::Partition}:codedeploy:${AWS::Region}:${AWS::AccountId}:deploymentconfig:${DeployConfig}"
-                    ),
-                ],
+                "*",
+            ),
+            statement(
+                ["elasticloadbalancing:DeregisterTargets", "elasticloadbalancing:RegisterTargets"],
+                R("Targets"),
+            ),
+            statement(
+                ["ssm:SendCommand"],
+                S("arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"),
+                Condition={
+                    "StringEquals": {"aws:ResourceTag/DeploymentStack": R("AWS::StackName")}
+                },
+            ),
+            statement(
+                ["ssm:SendCommand"],
+                S("arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript"),
+            ),
+            statement(
+                ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+                A("PipelineLogs", "Arn"),
             ),
         ],
     )
@@ -944,6 +928,7 @@ systemctl enable --now codedeploy-agent
         "Pipeline",
         "CodePipeline::Pipeline",
         {
+            "Name": S("${AWS::StackName}-pipeline"),
             "RoleArn": A("PipelineRole", "Arn"),
             "PipelineType": "V2",
             "ExecutionMode": "QUEUED",
@@ -1000,12 +985,18 @@ systemctl enable --now codedeploy-agent
                             "ActionTypeId": {
                                 "Category": "Deploy",
                                 "Owner": "AWS",
-                                "Provider": "CodeDeploy",
+                                "Provider": "EC2",
                                 "Version": "1",
                             },
                             "Configuration": {
-                                "ApplicationName": R("DeployApplication"),
-                                "DeploymentGroupName": R("DeployGroup"),
+                                "InstanceTagKey": "DeploymentStack",
+                                "InstanceTagValue": R("AWS::StackName"),
+                                "InstanceType": "EC2",
+                                "TargetDirectory": "/opt/tenderlens/incoming",
+                                "PostScript": "scripts/deploy.sh",
+                                "TargetGroupNameList": A("Targets", "TargetGroupName"),
+                                "MaxBatch": "1",
+                                "MaxError": "0",
                             },
                             "InputArtifacts": [{"Name": "Release"}],
                         }

@@ -19,7 +19,7 @@ parser.add_argument("--connection-arn")
 args = parser.parse_args()
 session = boto3.Session(profile_name=args.profile, region_name=args.region)
 cf = session.client("cloudformation")
-names = {"storage": "tenderlens-storage", "data": "tenderlens-db", "service": "tenderlens-service"}
+names = {"storage": "tenderlens-storage", "data": "tenderlens-db", "service": "tenderlens-web"}
 body = json.loads((Path(__file__).parent / "templates" / f"{args.stack}.json").read_text())
 
 

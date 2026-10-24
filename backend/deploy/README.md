@@ -38,14 +38,16 @@ a demo topology, not a highly available application tier.
 1. `storage.json`: retained KMS key, private/versioned S3 buckets, ECR repositories,
    encrypted database logs, and server-only provider configuration.
 2. `data.json`: VPC, subnets, security groups, TLS parameter group, and RDS PostgreSQL.
-3. `service.json`: EC2/SSM, internal ALB, CloudFront VPC origin, and CI/CD roles/services.
+3. `service.json`: EC2/SSM, internal ALB, CloudFront VPC origin, and CI/CD roles/services
+   in the `tenderlens-web` stack.
 
-CodeConnections → CodePipeline V2 (`QUEUED`) → CodeBuild → ECR → CodeDeploy.
+CodeConnections → CodePipeline V2 (`QUEUED`) → CodeBuild → ECR → native CodePipeline EC2 deployment over SSM.
 The `main` branch runs backend lint/migrations/tests/benchmark, frontend quality
 checks, production container builds, and web/API/database smoke tests before deploy.
-CodeDeploy drains traffic, runs database migrations as `tl_migrator`, restarts API,
-worker, and Next.js, and validates readiness. Deployment failures trigger application
-rollback. Database migrations are forward-only; write backward-compatible migrations
+The EC2 deployment action drains traffic, runs database migrations as `tl_migrator`, restarts API,
+worker, and Next.js, and validates readiness. A failed health check restores the previous application release and skips older
+Alembic migrations during rollback. Healthy releases are archived in S3 so replacement
+hosts can recover them. Database migrations are forward-only; write backward-compatible migrations
 because application rollback does not reverse schema changes.
 
 Image tags include the source revision and unique build number and are immutable.
@@ -73,7 +75,9 @@ During initial deployment, the production RDS attempt was rejected by the Free
 account plan. Its network rolled back and no database was created. The retained
 storage was imported into `tenderlens-storage` and reused; the failed original
 `tenderlens-data` stack remains as an audit record. No pre-existing project data was
-deleted or migrated from a local database.
+deleted or migrated from a local database. The first service stack, `tenderlens-service`,
+failed because CodeDeploy requires an unavailable subscription; it has no running host.
+The replacement `tenderlens-web` stack uses the supported native EC2 deployment action.
 
 ## Provider setup and operations
 

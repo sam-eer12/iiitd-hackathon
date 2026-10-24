@@ -26,7 +26,6 @@ phases:
       - docker push "$BACKEND_REPOSITORY:$RELEASE_TAG"
       - docker push "$FRONTEND_REPOSITORY:$RELEASE_TAG"
       - mkdir -p release/scripts release/vendor
-      - cp backend/deploy/appspec.yml release/appspec.yml
       - cp backend/deploy/scripts/* release/scripts/
       - cp backend/deploy/vendor/asm-exec release/vendor/
       - chmod +x release/scripts/*.sh release/vendor/asm-exec

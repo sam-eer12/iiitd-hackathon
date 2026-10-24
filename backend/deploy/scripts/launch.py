@@ -42,36 +42,37 @@ backend_env.update({key: str(value) for key, value in provider.items() if key in
 os.environ.update(backend_env)
 os.environ["DATABASE_HOST"] = config["databaseHost"]
 docker_env = [part for key in backend_env for part in ["-e", key]]
-mount = f"{Path.cwd()}:/deployment:ro"
-run(
-    "docker",
-    "run",
-    "--rm",
-    "-v",
-    mount,
-    "-e",
-    "DATABASE_HOST",
-    "-e",
-    "BOOTSTRAP_USERNAME",
-    "-e",
-    "BOOTSTRAP_PASSWORD",
-    images["backend"],
-    "/app/.venv/bin/python",
-    "/deployment/scripts/bootstrap_db.py",
-)
+if os.environ.get("SKIP_MIGRATIONS") != "1":
+    mount = f"{Path.cwd()}:/deployment:ro"
+    run(
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        mount,
+        "-e",
+        "DATABASE_HOST",
+        "-e",
+        "BOOTSTRAP_USERNAME",
+        "-e",
+        "BOOTSTRAP_PASSWORD",
+        images["backend"],
+        "/app/.venv/bin/python",
+        "/deployment/scripts/bootstrap_db.py",
+    )
+    os.environ["DATABASE_URL"] = db_url("tl_migrator")
+    run(
+        "docker",
+        "run",
+        "--rm",
+        *docker_env,
+        images["backend"],
+        "sh",
+        "-ec",
+        "/app/.venv/bin/alembic upgrade head && /app/.venv/bin/python -m app.cli.seed",
+    )
 os.environ.pop("BOOTSTRAP_PASSWORD", None)
 os.environ.pop("BOOTSTRAP_USERNAME", None)
-os.environ["DATABASE_URL"] = db_url("tl_migrator")
-run(
-    "docker",
-    "run",
-    "--rm",
-    *docker_env,
-    images["backend"],
-    "sh",
-    "-ec",
-    "/app/.venv/bin/alembic upgrade head && /app/.venv/bin/python -m app.cli.seed",
-)
 os.environ["DATABASE_URL"] = db_url("tl_app")
 if subprocess.run(
     ["docker", "network", "inspect", "tenderlens"],
