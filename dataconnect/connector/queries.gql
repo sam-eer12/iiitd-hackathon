@@ -1,0 +1,38 @@
+query GetCurrentUser @auth(level: USER) {
+  user(key: { uid_expr: "auth.uid" }) {
+    uid
+    email
+    displayName
+    photoUrl
+  }
+}
+
+query GetMySupplierProfile @auth(level: USER) {
+  supplierProfiles(
+    where: { owner: { uid: { eq_expr: "auth.uid" } } }
+    limit: 1
+  ) {
+    id
+    companyName
+    categories
+    turnoverLakhs
+    turnoverYears
+    maxEmdCapacityLakhs
+    updatedAt
+  }
+}
+
+query ListMySavedTenders @auth(level: USER) {
+  savedTenders(
+    where: { owner: { uid: { eq_expr: "auth.uid" } } }
+    orderBy: [{ savedAt: DESC }]
+  ) {
+    id
+    tenderRef
+    title
+    sourceUrl
+    closingDate
+    readinessStatus
+    savedAt
+  }
+}

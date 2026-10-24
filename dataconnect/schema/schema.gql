@@ -1,0 +1,32 @@
+# PostgreSQL Database Schema for TenderLens via Firebase SQL Connect
+
+type User @table(key: "uid") {
+  uid: String! @default(expr: "auth.uid")
+  email: String! @unique
+  displayName: String
+  photoUrl: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type SupplierProfile @table {
+  id: UUID! @default(expr: "uuidV4()")
+  owner: User!
+  companyName: String!
+  categories: [String!]!
+  turnoverLakhs: Float
+  turnoverYears: Int
+  maxEmdCapacityLakhs: Float
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type SavedTender @table {
+  id: UUID! @default(expr: "uuidV4()")
+  owner: User!
+  tenderRef: String!
+  title: String!
+  sourceUrl: String
+  closingDate: String
+  readinessStatus: String # Meets, Blocked, Review needed
+  savedAt: Timestamp! @default(expr: "request.time")
+}

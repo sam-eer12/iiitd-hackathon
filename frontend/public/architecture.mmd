@@ -1,0 +1,59 @@
+flowchart TB
+  subgraph experience["TENDERLENS · PRODUCT EXPERIENCE"]
+    Visitor["Supplier"] --> Landing["Public landing page"]
+    Landing --> Dashboard["Dashboard · collapsible sidebar"]
+    Dashboard --> Shortlist["Discover and save tenders"]
+    Dashboard --> Profile["Supplier profile"]
+    Dashboard --> Evidence["Clause evidence and readiness"]
+    Dashboard --> History["Amendment history"]
+  end
+  subgraph app["APPLICATION · NEXT.JS + FASTAPI"]
+    Dashboard --> Proxy["Next.js server API layer"]
+    Proxy --> API["FastAPI · validated application API"]
+    API --> Jobs["Durable refresh jobs"]
+    Jobs --> Worker["Python worker · bounded retries"]
+    Profile --> API
+  end
+  subgraph collection["TINYFISH · PUBLIC SOURCE COLLECTION"]
+    Worker -->|"Submit /run-async"| Agent["TinyFish Agent API"]
+    Worker -->|"Poll /runs/id"| Agent
+    Agent --> Portal["Allowlisted tender pages · IIIT-Delhi"]
+    Portal --> Notices["Notice links and corrigenda"]
+    Notices --> Validation["Validate structured output and source URLs"]
+  end
+  subgraph intelligence["EVIDENCE AND DECISION PIPELINE"]
+    Validation --> Download["Download PDFs · SHA-256 versioning"]
+    Download --> Parse["PyMuPDF · page and clause extraction"]
+    Parse --> Rules["Deterministic readiness checks"]
+    Rules --> Checks["Turnover · experience · certificates · EMD · deadline"]
+    Parse --> Diff["Document and condition comparison"]
+    Diff --> Rules
+    Checks --> Result["Meets checked conditions · Blocked · Review needed"]
+    Result --> API
+    Diff --> API
+  end
+  subgraph aws["PLANNED AWS DEPLOYMENT"]
+    Amplify["Amplify · Next.js hosting"]
+    EC2["EC2 Docker · API and worker"]
+    DB[("RDS PostgreSQL · profiles, jobs, versions, evaluations")]
+    S3[("Private S3 · PDFs and snapshots")]
+    Secrets["Secrets Manager · server-only API key"]
+    Logs["CloudWatch · run and error logs"]
+  end
+  Landing -.-> Amplify
+  API -.-> EC2
+  Worker --> DB
+  API --> DB
+  Download --> S3
+  Evidence --> Proxy
+  History --> Proxy
+  API --> S3
+  Secrets --> Worker
+  Worker --> Logs
+  API --> Logs
+  classDef green fill:#e9f1e8,stroke:#41634b,color:#173b2e
+  classDef dark fill:#173b2e,stroke:#173b2e,color:#fff
+  classDef yellow fill:#f5f1d7,stroke:#b3a45e,color:#594c20
+  class Dashboard,Landing,Result dark
+  class Agent,Validation,Download,Parse,Rules,Diff,Checks green
+  class Secrets,Logs yellow

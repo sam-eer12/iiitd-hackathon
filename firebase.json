@@ -1,0 +1,17 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TenderLens",
+        "supportEmail": "sameer870732@gmail.com",
+        "authorizedRedirectUris": [
+          "https://tenderlens-app-2026.firebaseapp.com/__/auth/handler",
+          "http://localhost:3000"
+        ]
+      }
+    }
+  },
+  "dataconnect": {
+    "source": "dataconnect"
+  }
+}
