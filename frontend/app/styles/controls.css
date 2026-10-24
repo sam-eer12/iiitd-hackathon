@@ -1,0 +1,336 @@
+/* Buttons, links, icon buttons, form fields and account controls. */
+
+/* ---------- Buttons ----------
+   .button-primary    light metallic, dark text (main action on a screen)
+   .button-secondary  dark glass with a silver border
+   .text-link         minimal tertiary action (below)
+   .button-small      compact size modifier
+   .button-selected   pressed state for toggle-style secondary buttons */
+.button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background var(--duration) var(--ease-out),
+    border-color var(--duration) var(--ease-out),
+    box-shadow var(--duration) var(--ease-out),
+    color var(--duration) var(--ease-out);
+}
+.button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--shine);
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+.button:not(:disabled):hover::after {
+  transform: translateX(130%);
+  transition: transform 0.85s var(--ease-out);
+}
+.button:not(:disabled):active {
+  transform: translateY(0) scale(0.985);
+}
+.button:disabled {
+  opacity: 0.5;
+}
+.button-small {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  gap: 8px;
+}
+
+.button-primary {
+  color: var(--text-on-light);
+  background: var(--metal-light);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(255, 255, 255, 0.06);
+}
+.button-primary::after {
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 70%
+  );
+  mix-blend-mode: soft-light;
+}
+.button-primary:not(:disabled):hover {
+  background: var(--metal-light-hover);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 12px 32px rgba(255, 255, 255, 0.1);
+}
+
+.button-secondary {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--border-strong);
+  box-shadow: var(--inner-highlight);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.button-secondary:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.36);
+  transform: translateY(-1px);
+}
+.button-selected,
+.button-secondary[aria-pressed="true"] {
+  background: var(--glass-strong);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+/* ---------- Text links ---------- */
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px
+    no-repeat;
+  transition:
+    background-size var(--duration) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.text-link:hover {
+  background-size: 100% 1px;
+}
+.text-link svg {
+  transition: transform var(--duration) var(--ease-out);
+}
+.text-link:hover svg:last-child {
+  transform: translateX(2px);
+}
+
+/* ---------- Icon buttons ---------- */
+.icon-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: var(--text-2);
+  border: 1px solid transparent;
+}
+.icon-button:hover {
+  background: var(--glass);
+  border-color: var(--border-faint);
+  color: var(--text);
+}
+
+/* ---------- Form fields (shared look) ---------- */
+.form-grid input:not([type="checkbox"]),
+.certificate-grid select,
+.source-access-field input,
+.advanced-filters select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13.5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+.form-grid input:not([type="checkbox"]):hover,
+.certificate-grid select:hover,
+.source-access-field input:hover,
+.advanced-filters select:hover {
+  border-color: var(--border-strong);
+}
+.form-grid input:not([type="checkbox"]):focus-visible,
+.certificate-grid select:focus-visible,
+.source-access-field input:focus-visible,
+.advanced-filters select:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  background: var(--surface-3);
+}
+input::placeholder {
+  color: var(--text-3);
+}
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Spinner ---------- */
+.spin {
+  animation: spin 1.1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Account controls (Firebase Google sign-in) ----------
+   The Google button keeps Google's multicolor mark, on Google's dark style. */
+.button-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 15px 0 12px;
+  border: 1px solid #8e918f;
+  border-radius: var(--radius-pill);
+  background: #131314;
+  color: #e3e3e3;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.button-google:not(:disabled):hover {
+  background: #1c1c1e;
+  border-color: #b3b6b4;
+}
+.button-compact {
+  width: 38px;
+  padding: 0;
+  justify-content: center;
+}
+.auth-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 3px 4px 3px 3px;
+  background: var(--metal-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  box-shadow: var(--inner-highlight);
+}
+.user-avatar-img,
+.user-avatar-initials {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.user-avatar-img {
+  object-fit: cover;
+}
+.user-avatar-initials {
+  display: grid;
+  place-items: center;
+  background: var(--metal-light);
+  color: var(--text-on-light);
+  font-weight: 650;
+  font-size: 11px;
+}
+.auth-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.15;
+  text-align: left;
+  min-width: 0;
+  max-width: 170px;
+}
+.auth-user-info strong,
+.auth-user-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-user-info strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.auth-user-info small {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.button-icon-subtle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text-2);
+}
+.button-icon-subtle:hover {
+  color: var(--blocked);
+  background: var(--blocked-bg);
+}
+.auth-profile-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+}
+.auth-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.auth-signin {
+  position: relative;
+  display: inline-flex;
+}
+.auth-error {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--review-border);
+  border-radius: 12px;
+  background: #17150f;
+  color: var(--review);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: var(--shadow-md);
+  animation: menu-in var(--duration) var(--ease-out) both;
+}
+.site-menu .auth-signin {
+  display: grid;
+  gap: 8px;
+}
+.site-menu .auth-error {
+  position: static;
+  width: auto;
+  max-width: none;
+}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/icon";
 
+export const metadata = { title: "Help & getting started" };
+
 export default function HelpPage() {
   return (
     <>

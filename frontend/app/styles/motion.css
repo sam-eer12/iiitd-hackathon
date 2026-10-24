@@ -1,0 +1,120 @@
+/* Motion. Every animation starts from the element's normal, visible state,
+   so content stays readable if animations are unsupported or disabled. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheen {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Staggered entrance: add .reveal, then .reveal-1 … .reveal-5 for order. */
+.reveal {
+  animation: rise-in var(--duration-slow) var(--ease-out) both;
+  animation-delay: calc(var(--reveal-step, 0) * 90ms);
+}
+.reveal-1 {
+  --reveal-step: 1;
+}
+.reveal-2 {
+  --reveal-step: 2;
+}
+.reveal-3 {
+  --reveal-step: 3;
+}
+.reveal-4 {
+  --reveal-step: 4;
+}
+.reveal-5 {
+  --reveal-step: 5;
+}
+
+/* Scroll reveal for long marketing pages, only where the browser supports
+   scroll-driven animations. Elsewhere the content simply shows. */
+@supports (animation-timeline: view()) {
+  .reveal-on-scroll {
+    animation: rise-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+
+/* Dashboard: only the page heading and the four stat cards animate in.
+   Table rows never animate, so filtering and sorting stay instant. */
+.workspace-heading {
+  animation: rise-in var(--duration-slow) var(--ease-out) both;
+}
+.stats-grid > .stat-card {
+  animation: rise-in var(--duration-slow) var(--ease-out) both;
+}
+.stats-grid > .stat-card:nth-child(2) {
+  animation-delay: 60ms;
+}
+.stats-grid > .stat-card:nth-child(3) {
+  animation-delay: 120ms;
+}
+.stats-grid > .stat-card:nth-child(4) {
+  animation-delay: 180ms;
+}
+
+/* Dialog entrance */
+.tender-dialog[open] {
+  animation: drawer-in var(--duration) var(--ease-out);
+}
+.tender-dialog[open]::backdrop {
+  animation: fade-in var(--duration) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .button::after,
+  .nav-pill-link::after {
+    display: none;
+  }
+}

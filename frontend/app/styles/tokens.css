@@ -1,0 +1,107 @@
+/* Design tokens. Every color, radius, shadow and timing in the app comes from here. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #000000;
+  --surface-1: #0a0a0a;
+  --surface-2: #111111;
+  --surface-3: #171717;
+  --surface-hover: #1a1a1a;
+  --scrim: rgba(0, 0, 0, 0.66);
+
+  /* Text */
+  --text: #ffffff;
+  --text-2: #a0a0a0;
+  --text-3: #8a8a8a;
+  --text-on-light: #0a0a0a;
+
+  /* Lines and glass */
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-faint: rgba(255, 255, 255, 0.07);
+  --glass: rgba(255, 255, 255, 0.08);
+  --glass-soft: rgba(255, 255, 255, 0.04);
+  --glass-strong: rgba(255, 255, 255, 0.12);
+
+  /* Restrained cool highlight */
+  --cool: #b9c7d8;
+  --cool-glow: rgba(160, 185, 215, 0.14);
+
+  /* Metal */
+  --metal-light: linear-gradient(180deg, #ffffff 0%, #e4e7eb 48%, #b9bec6 100%);
+  --metal-light-hover: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #f0f2f5 48%,
+    #cdd2d9 100%
+  );
+  --metal-dark: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.025) 100%
+  );
+  --metal-rim: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.34),
+    rgba(255, 255, 255, 0.08) 55%,
+    rgba(255, 255, 255, 0.16)
+  );
+  --shine: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 70%
+  );
+
+  /* Status: meaning is preserved from the original theme, tuned for dark */
+  --meets: #7dd3a3;
+  --meets-bg: rgba(125, 211, 163, 0.1);
+  --meets-border: rgba(125, 211, 163, 0.28);
+  --review: #e7c56f;
+  --review-bg: rgba(231, 197, 111, 0.1);
+  --review-border: rgba(231, 197, 111, 0.28);
+  --blocked: #f2938a;
+  --blocked-bg: rgba(242, 147, 138, 0.1);
+  --blocked-border: rgba(242, 147, 138, 0.3);
+  --info: #9fc2f5;
+  --info-bg: rgba(159, 194, 245, 0.09);
+  --info-border: rgba(159, 194, 245, 0.26);
+
+  /* Type */
+  --font-sans:
+    var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-display:
+    var(--font-instrument-serif), "Instrument Serif", Georgia,
+    "Times New Roman", serif;
+  --font-document: Georgia, "Times New Roman", serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  /* Shape */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* Depth */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md:
+    0 10px 30px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.6);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 160ms;
+  --duration: 240ms;
+  --duration-slow: 720ms;
+
+  /* Focus */
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(255, 255, 255, 0.85);
+}

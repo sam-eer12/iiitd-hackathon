@@ -148,7 +148,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           );
       }
     };
-    const timer = setInterval(poll, 15000);
+    const timer = setInterval(poll, 5000);
     void poll();
     return () => {
       controller.abort();

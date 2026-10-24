@@ -1,0 +1,250 @@
+/* Reset, typography and page-level primitives. */
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  background: var(--bg);
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text-on-light);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+  border: 0;
+  background: none;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+button[aria-busy="true"] {
+  cursor: progress;
+}
+button:not(:disabled),
+a {
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+input,
+select {
+  min-width: 0;
+}
+select {
+  color-scheme: dark;
+}
+option {
+  background: var(--surface-2);
+  color: var(--text);
+}
+svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+code {
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--glass);
+  border: 1px solid var(--border-faint);
+}
+
+/* Selective italic serif accent, used only where markup opts in. */
+.serif-accent {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: -80px;
+  left: 16px;
+  background: var(--text);
+  color: var(--text-on-light);
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+}
+.skip-link:focus {
+  top: 12px;
+}
+.page-width {
+  width: calc(100% - 112px);
+  max-width: 1264px;
+  margin-inline: auto;
+}
+@media (max-width: 1200px) {
+  .page-width {
+    width: calc(100% - 64px);
+  }
+}
+@media (max-width: 860px) {
+  .page-width {
+    width: calc(100% - 48px);
+  }
+}
+@media (max-width: 500px) {
+  .page-width {
+    width: calc(100% - 32px);
+  }
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  line-height: 1.6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.muted {
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.8;
+  margin-top: 10px;
+}
+
+/* Brand */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+  letter-spacing: -0.04em;
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--text);
+}
+.brand-lightweight {
+  font-weight: 400;
+  color: var(--text-2);
+}
+.brand-period {
+  color: var(--cool);
+}
+.brand-mark {
+  display: flex;
+  width: 26px;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transform: skew(-15deg);
+}
+.brand-mark i {
+  display: block;
+  width: 5px;
+  height: 18px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #ffffff, #9aa1aa);
+}
+.brand-mark i:nth-child(2) {
+  height: 26px;
+  background: linear-gradient(180deg, #e9edf2, #6f7782);
+}
+.brand-mark i:nth-child(3) {
+  height: 14px;
+  align-self: flex-start;
+  margin-top: 3px;
+  background: linear-gradient(180deg, #c5d2e1, #5b6470);
+}
+.brand-light {
+  color: var(--text);
+}
+
+/* Small status dot used for live / sample mode */
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--meets);
+  box-shadow: 0 0 0 3px rgba(125, 211, 163, 0.14);
+  flex-shrink: 0;
+}
+.live-dot.is-warning {
+  background: var(--review);
+  box-shadow: 0 0 0 3px rgba(231, 197, 111, 0.14);
+}
+.live-dot.is-idle {
+  background: var(--text-3);
+  box-shadow: none;
+}

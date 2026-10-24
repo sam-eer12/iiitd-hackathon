@@ -221,18 +221,34 @@ function ProfileForm({
         </div>
       </div>
       <div className="form-footer">
-        <span>
-          <Icon name="shield" size={16} />
-          Stored in this browser. Use sample business facts.
+        <span role="status">
+          <Icon name={dirty ? "alert" : "shield"} size={16} />
+          {dirty
+            ? "You have unsaved changes."
+            : "Stored in this browser. Use sample business facts."}
         </span>
-        <button
-          type="submit"
-          className="button button-dark button-small"
-          disabled={!dirty}
-        >
-          <Icon name="check" size={16} />
-          {dirty ? "Save profile" : "Profile up to date"}
-        </button>
+        <div className="form-footer-actions">
+          {dirty && (
+            <button
+              type="button"
+              className="button button-secondary button-small"
+              onClick={() => {
+                setDraft(profile);
+                setDirty(false);
+              }}
+            >
+              Discard changes
+            </button>
+          )}
+          <button
+            type="submit"
+            className="button button-primary button-small"
+            disabled={!dirty}
+          >
+            <Icon name="check" size={16} />
+            {dirty ? "Save profile" : "Profile up to date"}
+          </button>
+        </div>
       </div>
     </form>
   );

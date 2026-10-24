@@ -3,6 +3,30 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icon";
 import { useWorkspace } from "@/components/workspace-provider";
+import type { DiscoveryJob } from "@/lib/types";
+
+const RUN_STATUS: Record<
+  DiscoveryJob["status"],
+  { label: string; tone: "meets" | "info" | "review" | "blocked" }
+> = {
+  completed: { label: "Completed", tone: "meets" },
+  running: { label: "Running", tone: "info" },
+  submitting: { label: "Starting", tone: "info" },
+  failed: { label: "Failed", tone: "blocked" },
+  cancelled: { label: "Cancelled", tone: "review" },
+  submission_unknown: { label: "Needs reconciliation", tone: "review" },
+};
+
+function formatRunTime(value: string) {
+  return `${new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  })} IST`;
+}
 
 export default function SourcesPage() {
   const { refresh, job, discoveryError, collectionMode } = useWorkspace();
@@ -48,8 +72,10 @@ export default function SourcesPage() {
               <p>Institutional procurement · Public tender portal</p>
             </div>
           </div>
-          <span className="subtle-tag">
-            <span className="live-dot" />
+          <span className="subtle-tag" role="status">
+            <span
+              className={`live-dot ${configured === null ? "is-idle" : configured ? "" : "is-warning"}`}
+            />
             {configured === null
               ? "Checking configuration…"
               : configured
@@ -118,8 +144,9 @@ export default function SourcesPage() {
         )}
         <div className="source-actions">
           <button
-            className="button button-dark button-small"
+            className="button button-primary button-small"
             disabled={isRunning || configured === false || configured === null}
+            aria-busy={isRunning}
             onClick={() => void refresh(accessToken)}
           >
             <Icon
@@ -153,21 +180,56 @@ export default function SourcesPage() {
         <h2>Latest application run</h2>
         {job ? (
           <>
-            <pre>
-              {JSON.stringify(
-                {
-                  applicationJob: job.id,
-                  tinyfishRun: job.providerRunId,
-                  status: job.status,
-                  startedAt: job.createdAt,
-                  finishedAt: job.finishedAt ?? "In progress",
-                  notices: job.tenders?.length ?? null,
-                  error: job.error ?? null,
-                },
-                null,
-                2,
+            <dl className="run-record">
+              <div>
+                <dt>Status</dt>
+                <dd>
+                  <span
+                    className={`run-status run-${RUN_STATUS[job.status].tone}`}
+                  >
+                    {RUN_STATUS[job.status].label}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>Application job</dt>
+                <dd>
+                  <code>{job.id}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>TinyFish run</dt>
+                <dd>
+                  {job.providerRunId ? (
+                    <code>{job.providerRunId}</code>
+                  ) : (
+                    "Not assigned"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Started</dt>
+                <dd>{formatRunTime(job.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Finished</dt>
+                <dd>
+                  {job.finishedAt
+                    ? formatRunTime(job.finishedAt)
+                    : "In progress"}
+                </dd>
+              </div>
+              <div>
+                <dt>Notices</dt>
+                <dd>{job.tenders ? job.tenders.length : "—"}</dd>
+              </div>
+              {job.error && (
+                <div className="run-record-message">
+                  <dt>Message</dt>
+                  <dd>{job.error}</dd>
+                </div>
               )}
-            </pre>
+            </dl>
             <p className="muted">
               Completed live notices stay Review needed until source clauses are
               extracted and verified.
