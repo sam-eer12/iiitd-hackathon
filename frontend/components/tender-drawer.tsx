@@ -24,14 +24,32 @@ export function TenderDrawer({
     profile,
     new Date(sample ? DEMO_CLOCK : evaluationTime),
   );
+  const deadline = tender.deadline ? new Date(tender.deadline) : null;
+  const checkCounts = {
+    meets: evaluation.findings.filter((finding) => finding.status === "meets")
+      .length,
+    review: evaluation.findings.filter((finding) => finding.status === "review")
+      .length,
+    blocked: evaluation.findings.filter(
+      (finding) => finding.status === "blocked",
+    ).length,
+  };
   const changes = sample
     ? SAMPLE_CHANGES.filter((change) => change.tenderId === tender.id)
     : [];
 
   useEffect(() => {
     const element = dialog.current;
+    // Return focus to whatever opened the review once it closes.
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
 
   return (
@@ -61,10 +79,62 @@ export function TenderDrawer({
           <p>
             {tender.issuer} <span>·</span> {tender.reference}
           </p>
+          <dl className="drawer-facts">
+            <div>
+              <dt>Closes</dt>
+              <dd>
+                {deadline
+                  ? deadline.toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      timeZone: "Asia/Kolkata",
+                    })
+                  : (tender.deadlineText ?? "Not stated")}
+                <small>
+                  {deadline
+                    ? `${deadline.toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                        timeZone: "Asia/Kolkata",
+                      })} IST`
+                    : "As listed · verify source"}
+                </small>
+              </dd>
+            </div>
+            <div>
+              <dt>Estimated value</dt>
+              <dd>
+                {tender.value}
+                <small>
+                  {sample ? "Illustrative" : "PDF extraction pending"}
+                </small>
+              </dd>
+            </div>
+            <div>
+              <dt>Checks</dt>
+              <dd>
+                {evaluation.findings.length
+                  ? `${checkCounts.meets} of ${evaluation.findings.length} meet`
+                  : "None extracted"}
+                <small>
+                  {evaluation.findings.length
+                    ? [
+                        checkCounts.review && `${checkCounts.review} to review`,
+                        checkCounts.blocked && `${checkCounts.blocked} blocked`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "No open issues"
+                    : "PDF checks pending"}
+                </small>
+              </dd>
+            </div>
+          </dl>
           <div className="drawer-heading-bottom">
             <StatusBadge status={evaluation.status} />
             <button
-              className={`button button-outline button-small ${savedIds.includes(tender.id) ? "button-selected" : ""}`}
+              className={`button button-secondary button-small ${savedIds.includes(tender.id) ? "button-selected" : ""}`}
               onClick={() => toggleSaved(tender.id)}
             >
               <Icon name="bookmark" size={15} />
