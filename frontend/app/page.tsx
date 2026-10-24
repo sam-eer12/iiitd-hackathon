@@ -3,10 +3,25 @@ import { Brand } from "@/components/brand";
 import { Icon } from "@/components/icon";
 import { HeroPreview } from "@/components/hero-preview";
 import { SiteHeader } from "@/components/site-header";
+import "./styles/background-grain.css";
 
 export default function Home() {
   return (
     <div className="landing">
+      <div className="background-grain" aria-hidden="true">
+        <svg width="100%" height="100%" focusable="false">
+          <filter id="landing-grain">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.92"
+              numOctaves="3"
+              stitchTiles="stitch"
+            />
+            <feColorMatrix type="saturate" values="0" />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#landing-grain)" />
+        </svg>
+      </div>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
