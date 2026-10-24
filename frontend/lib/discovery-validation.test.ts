@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   validateDiscoveryResult,
@@ -99,4 +100,42 @@ test("duplicate notices and over-limit batches are rejected", () => {
       }),
     /at most five/,
   );
+});
+
+test("notice identity survives a new run and a changed listing order", () => {
+  const first = { ...notice, notice_id: "GEM/2026/B/8183492" };
+  const second = { ...notice, notice_id: "GEM/2026/B/8106278" };
+  const previous = validateDiscoveryResult(
+    { outcome: "success", failure_reason: null, notices: [first, second] },
+    "2026-10-24T09:00:00Z",
+    "run-one",
+  );
+  const next = validateDiscoveryResult(
+    { outcome: "success", failure_reason: null, notices: [second, first] },
+    "2026-10-25T09:00:00Z",
+    "run-two",
+  );
+  assert.equal(previous[0].id, next[1].id);
+  assert.equal(previous[1].id, next[0].id);
+  assert.notEqual(previous[0].sourceRunId, next[1].sourceRunId);
+});
+
+test("bundled TinyFish snapshot supplies real source records without eligibility claims", () => {
+  const snapshot = JSON.parse(
+    readFileSync(new URL("./data/iiitd-tenders.json", import.meta.url), "utf8"),
+  );
+  assert.equal(snapshot.provider, "TinyFish");
+  assert.match(snapshot.providerRunId, /^[a-f0-9-]{36}$/);
+  const tenders = validateDiscoveryResult(
+    snapshot.result,
+    snapshot.retrievedAt,
+    snapshot.providerRunId,
+  );
+  assert.ok(tenders.length > 0);
+  for (const tender of tenders) {
+    assert.equal(tender.provenance, "live");
+    assert.ok(tender.pdfUrls.length > 0);
+    assert.deepEqual(tender.conditions, []);
+    assert.equal(tender.value, "Not extracted");
+  }
 });

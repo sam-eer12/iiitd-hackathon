@@ -1,6 +1,17 @@
 import type { Tender } from "./types";
+import { parseIiitdDeadline } from "./source-deadline.ts";
 
 const SOURCE_HOSTS = new Set(["iiitd.ac.in", "www.iiitd.ac.in"]);
+export function tenderIdentity(
+  tender: Pick<Tender, "reference" | "title" | "sourceUrl">,
+) {
+  const reference = tender.reference.trim();
+  return `iiitd-${encodeURIComponent(
+    reference && reference !== "Reference not provided"
+      ? reference
+      : `${tender.sourceUrl}|${tender.title.trim()}`,
+  )}`;
+}
 export function validateSourceUrl(value: unknown): string {
   if (typeof value !== "string")
     throw new Error("A source URL is missing or invalid.");
@@ -41,7 +52,7 @@ export function validateDiscoveryResult(
   if (data.outcome === "success" && !data.notices.length)
     throw new Error("The source returned success without any notices.");
   const seen = new Set<string>();
-  return data.notices.map((value, index) => {
+  return data.notices.map((value) => {
     if (!value || typeof value !== "object")
       throw new Error("A notice is not a valid object.");
     const notice = value as Record<string, unknown>;
@@ -68,16 +79,21 @@ export function validateDiscoveryResult(
     const amendmentUrls = [
       ...new Set(notice.amendment_urls.map(validateSourceUrl)),
     ];
-    const identity = `${notice.notice_id ?? ""}|${notice.title}|${sourceUrl}`;
+    const reference =
+      typeof notice.notice_id === "string" && notice.notice_id.trim()
+        ? notice.notice_id.trim()
+        : "Reference not provided";
+    const identity = tenderIdentity({
+      reference,
+      title: notice.title,
+      sourceUrl,
+    });
     if (seen.has(identity))
       throw new Error("The source returned duplicate notice entries.");
     seen.add(identity);
     return {
-      id: `live-${runId}-${index}`,
-      reference:
-        typeof notice.notice_id === "string" && notice.notice_id.trim()
-          ? notice.notice_id
-          : "Reference not provided",
+      id: identity,
+      reference,
       title: notice.title.trim(),
       description:
         "Discovered on the public source. PDF clause verification is pending.",
@@ -85,13 +101,14 @@ export function validateDiscoveryResult(
       category: "Unclassified",
       value: "Not extracted",
       deadlineText: notice.deadline_text as string | null,
-      deadline: null,
+      deadline: parseIiitdDeadline(notice.deadline_text as string | null),
       relevance: null,
       sourceUrl,
       pdfUrls,
       amendmentUrls,
       provenance: "live",
       retrievedAt,
+      sourceRunId: runId,
       amended: amendmentUrls.length > 0,
       conditions: [],
     };

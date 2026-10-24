@@ -46,6 +46,7 @@ export interface Tender {
   amendmentUrls: string[];
   provenance: "sample" | "live";
   retrievedAt: string;
+  sourceRunId?: string;
   amended: boolean;
   conditions: Condition[];
 }
@@ -55,6 +56,13 @@ export interface Finding {
   status: Readiness;
   reason: string;
   supplierValue: string;
+}
+
+export interface TenderCatalog {
+  tenders: Tender[];
+  retrievedAt: string;
+  providerRunId: string;
+  sourceUrl: string;
 }
 export interface Evaluation {
   status: Readiness;
