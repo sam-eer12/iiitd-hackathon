@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icon";
 import { AuthProfile } from "@/components/auth-profile";
@@ -8,10 +7,8 @@ import { useWorkspace } from "@/components/workspace-provider";
 import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
-  const { collapsed, toggleSidebar, clearLiveResults, job } = useWorkspace();
+  const { collapsed, toggleSidebar } = useWorkspace();
   const { user, loading } = useAuth();
-  const [confirm, setConfirm] = useState(false);
-  const running = !!job && ["running", "submitting"].includes(job.status);
   return (
     <>
       <div className="workspace-heading">
@@ -65,39 +62,6 @@ export default function SettingsPage() {
           >
             Manage source <Icon name="arrowRight" size={15} />
           </Link>
-        </div>
-        <div className="settings-row">
-          <div>
-            <h2>Return to the sample workspace</h2>
-            <p>
-              Clear this browser’s live results and display the illustrative
-              sample notices. Your supplier profile and bookmarks stay saved.
-              The server’s run history is retained.
-            </p>
-          </div>
-          <div className="settings-actions">
-            {confirm && (
-              <button
-                type="button"
-                className="button button-secondary button-small"
-                onClick={() => setConfirm(false)}
-              >
-                Cancel
-              </button>
-            )}
-            <button
-              className={`button button-small ${confirm ? "button-primary" : "button-secondary"}`}
-              disabled={running}
-              onClick={() => {
-                if (confirm) {
-                  clearLiveResults();
-                  setConfirm(false);
-                } else setConfirm(true);
-              }}
-            >
-              {confirm ? "Confirm sample view" : "Show sample data"}
-            </button>
-          </div>
         </div>
       </section>
     </>

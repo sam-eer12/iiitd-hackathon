@@ -192,8 +192,8 @@ export default function Home() {
             Step into your workspace <Icon name="arrowRight" size={17} />
           </Link>
           <p>
-            Explore the sample workspace. Connect live discovery when you’re
-            ready.
+            Explore real IIIT-Delhi notices collected with TinyFish. Refresh the
+            source when you’re ready.
           </p>
         </section>
       </main>

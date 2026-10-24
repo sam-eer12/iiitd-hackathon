@@ -29,7 +29,8 @@ function formatRunTime(value: string) {
 }
 
 export default function SourcesPage() {
-  const { refresh, job, discoveryError, collectionMode } = useWorkspace();
+  const { refresh, job, discoveryError, catalogRetrievedAt, tenders } =
+    useWorkspace();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [tokenRequired, setTokenRequired] = useState(false);
   const [accessToken, setAccessToken] = useState("");
@@ -109,9 +110,11 @@ export default function SourcesPage() {
           <div>
             <small>WORKSPACE DATA</small>
             <strong>
-              {collectionMode === "live"
-                ? "Live discovery snapshot"
-                : "Illustrative sample notices"}
+              {tenders.length} real notices · collected{" "}
+              {new Date(catalogRetrievedAt).toLocaleString("en-GB", {
+                timeZone: "Asia/Kolkata",
+              })}{" "}
+              IST
             </strong>
           </div>
         </div>
@@ -237,8 +240,8 @@ export default function SourcesPage() {
           </>
         ) : (
           <p className="muted">
-            No application run yet. Your sample workspace is ready to explore in
-            the meantime.
+            Showing the recorded TinyFish source snapshot. Start a live run to
+            collect a newer observation of the public listing.
           </p>
         )}
       </section>

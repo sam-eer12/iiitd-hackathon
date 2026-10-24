@@ -25,15 +25,8 @@ const workspaceNavigation: { href: string; label: string; icon: IconName }[] = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const {
-    collapsed,
-    toggleSidebar,
-    profile,
-    savedIds,
-    job,
-    tenders,
-    collectionMode,
-  } = useWorkspace();
+  const { collapsed, toggleSidebar, profile, savedIds, job, tenders } =
+    useWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
   const amendedCount = tenders.filter((tender) => tender.amended).length;
   const pageName =
@@ -187,18 +180,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="topbar-right">
             <span
-              className={`workspace-mode workspace-mode-${collectionMode}`}
-              title={
-                collectionMode === "live"
-                  ? "Live discovery"
-                  : "Sample workspace"
-              }
+              className="workspace-mode workspace-mode-live"
+              title="TinyFish source snapshot"
             >
               <span className="live-dot" />
               <span className="workspace-mode-label">
-                {collectionMode === "live"
-                  ? "Live discovery"
-                  : "Sample workspace"}
+                TinyFish source snapshot
               </span>
             </span>
             <AuthProfile />

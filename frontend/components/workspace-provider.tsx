@@ -8,23 +8,25 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { DEFAULT_PROFILE, DEMO_CLOCK, SAMPLE_TENDERS } from "@/lib/demo-data";
-import type { DiscoveryJob, SupplierProfile, Tender } from "@/lib/types";
+import { DEFAULT_PROFILE } from "@/lib/demo-data";
+import { INITIAL_TENDER_CATALOG } from "@/lib/tender-catalog";
+import {
+  restoreWorkspace,
+  type StoredWorkspace,
+} from "@/lib/workspace-storage";
+import type {
+  DiscoveryJob,
+  SupplierProfile,
+  Tender,
+  TenderCatalog,
+} from "@/lib/types";
 
 const STORAGE_KEY = "tenderlens.workspace.v1";
-interface StoredWorkspace {
-  profile: SupplierProfile;
-  savedIds: string[];
-  liveTenders: Tender[];
-  collectionMode: "sample" | "live";
-  job: DiscoveryJob | null;
-  collapsed: boolean;
-}
 const initial: StoredWorkspace = {
   profile: DEFAULT_PROFILE,
-  savedIds: ["sample-1", "sample-2"],
-  liveTenders: [],
-  collectionMode: "sample",
+  savedIds: [],
+  liveTenders: INITIAL_TENDER_CATALOG.tenders,
+  catalogRetrievedAt: INITIAL_TENDER_CATALOG.retrievedAt,
   job: null,
   collapsed: false,
 };
@@ -33,15 +35,7 @@ const readySubscribe = () => () => {};
 function readStoredWorkspace(): StoredWorkspace {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return initial;
-    const value = JSON.parse(raw);
-    if (
-      !value.profile?.turnover ||
-      !Array.isArray(value.savedIds) ||
-      !Array.isArray(value.liveTenders)
-    )
-      return initial;
-    return { ...initial, ...value };
+    return raw ? restoreWorkspace(JSON.parse(raw), initial) : initial;
   } catch {
     return initial;
   }
@@ -58,7 +52,6 @@ interface WorkspaceContextValue extends StoredWorkspace {
   toggleSidebar: () => void;
   notify: (message: string) => void;
   refresh: (accessToken?: string) => Promise<void>;
-  clearLiveResults: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -73,7 +66,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState("");
   const [discoveryError, setDiscoveryError] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [evaluationTime, setEvaluationTime] = useState(DEMO_CLOCK);
+  const [evaluationTime, setEvaluationTime] = useState(
+    INITIAL_TENDER_CATALOG.retrievedAt,
+  );
 
   useEffect(() => {
     const workspace = readStoredWorkspace();
@@ -83,6 +78,33 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const controller = new AbortController();
+    fetch("/api/tenders", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Source snapshot unavailable");
+        const catalog: TenderCatalog = await response.json();
+        setStored((previous) =>
+          Date.parse(catalog.retrievedAt) >
+          Date.parse(previous.catalogRetrievedAt)
+            ? {
+                ...previous,
+                liveTenders: catalog.tenders,
+                catalogRetrievedAt: catalog.retrievedAt,
+              }
+            : previous,
+        );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setDiscoveryError(
+            "Could not load the latest source snapshot. Showing the last collected notices.",
+          );
+      });
+    return () => controller.abort();
+  }, [loaded]);
 
   useEffect(() => {
     if (loaded) {
@@ -109,14 +131,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const applyJob = useCallback((job: DiscoveryJob) => {
-    setStored((previous) => ({
-      ...previous,
-      job,
-      collectionMode:
-        job.status === "completed" ? "live" : previous.collectionMode,
-      liveTenders:
-        job.status === "completed" ? (job.tenders ?? []) : previous.liveTenders,
-    }));
+    setStored((previous) => {
+      const newer =
+        job.status === "completed" &&
+        Date.parse(job.finishedAt ?? job.createdAt) >=
+          Date.parse(previous.catalogRetrievedAt);
+      return {
+        ...previous,
+        job,
+        liveTenders: newer ? (job.tenders ?? []) : previous.liveTenders,
+        catalogRetrievedAt: newer
+          ? (job.finishedAt ?? job.createdAt)
+          : previous.catalogRetrievedAt,
+      };
+    });
     if (["failed", "submission_unknown", "cancelled"].includes(job.status))
       setDiscoveryError(
         job.error ??
@@ -187,8 +215,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const value: WorkspaceContextValue = {
     ...stored,
     ready: ready && loaded,
-    tenders:
-      stored.collectionMode === "live" ? stored.liveTenders : SAMPLE_TENDERS,
+    tenders: stored.liveTenders,
     toast,
     discoveryError,
     evaluationTime,
@@ -210,15 +237,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       })),
     notify: setToast,
     refresh,
-    clearLiveResults: () => {
-      setStored((previous) => ({
-        ...previous,
-        liveTenders: [],
-        job: null,
-        collectionMode: "sample",
-      }));
-      setToast("Showing the illustrative sample workspace.");
-    },
   };
 
   return (

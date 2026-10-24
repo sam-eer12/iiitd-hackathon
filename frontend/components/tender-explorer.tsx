@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DEMO_CLOCK, SAMPLE_CHANGES } from "@/lib/demo-data";
 import { evaluateTender } from "@/lib/rules";
 import type { DiscoveryJob, Readiness, Tender } from "@/lib/types";
 import { Icon, type IconName } from "./icon";
@@ -42,7 +41,13 @@ function StatCard({
   );
 }
 
-function DeadlineCell({ tender }: { tender: Tender }) {
+function DeadlineCell({
+  tender,
+  evaluationTime,
+}: {
+  tender: Tender;
+  evaluationTime: string;
+}) {
   if (tender.deadline) {
     const deadline = new Date(tender.deadline);
     return (
@@ -55,13 +60,14 @@ function DeadlineCell({ tender }: { tender: Tender }) {
           })}
         </span>
         <span className="deadline-time">
-          {deadline.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: "Asia/Kolkata",
-          })}{" "}
-          IST
+          {deadline < new Date(evaluationTime)
+            ? "Deadline passed"
+            : `${deadline.toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+                timeZone: "Asia/Kolkata",
+              })} IST`}
         </span>
       </>
     );
@@ -91,16 +97,13 @@ const timeFormat: Intl.DateTimeFormatOptions = {
   timeZone: "Asia/Kolkata",
 };
 
-/* Recent workspace events, built only from existing records: the latest
-   source run and the amendment records (sample ones stay labelled). */
+/* Recent workspace events from the latest source run and amendment links. */
 function RecentActivity({
   job,
   tenders,
-  sample,
 }: {
   job: DiscoveryJob | null;
   tenders: Tender[];
-  sample: boolean;
 }) {
   const items: {
     id: string;
@@ -152,26 +155,14 @@ function RecentActivity({
     };
     items.push({ id: job.id, href: "/dashboard/sources", ...run });
   }
-  if (sample)
-    for (const change of SAMPLE_CHANGES) {
-      const tender = tenders.find((item) => item.id === change.tenderId);
-      items.push({
-        id: change.id,
-        href: "/dashboard/amendments",
-        tone: "review",
-        title: change.field,
-        detail: `${tender?.title ?? "Sample tender"} · ${change.date} · synthetic`,
-      });
-    }
-  else
-    for (const tender of tenders.filter((item) => item.amendmentUrls.length))
-      items.push({
-        id: `amendments-${tender.id}`,
-        href: "/dashboard/amendments",
-        tone: "review",
-        title: "Amendment links found",
-        detail: `${tender.title} · not yet compared`,
-      });
+  for (const tender of tenders.filter((item) => item.amendmentUrls.length))
+    items.push({
+      id: `amendments-${tender.id}`,
+      href: "/dashboard/amendments",
+      tone: "review",
+      title: "Amendment links found",
+      detail: `${tender.title} · not yet compared`,
+    });
   return (
     <section className="activity-card" aria-labelledby="activity-heading">
       <div className="aside-card-heading">
@@ -219,7 +210,7 @@ export function TenderExplorer({
     discoveryError,
     notify,
     evaluationTime,
-    collectionMode,
+    catalogRetrievedAt,
     ready,
   } = useWorkspace();
   const [query, setQuery] = useState("");
@@ -251,13 +242,7 @@ export function TenderExplorer({
     () =>
       tenders.map((tender) => ({
         tender,
-        evaluation: evaluateTender(
-          tender,
-          profile,
-          new Date(
-            tender.provenance === "sample" ? DEMO_CLOCK : evaluationTime,
-          ),
-        ),
+        evaluation: evaluateTender(tender, profile, new Date(evaluationTime)),
       })),
     [tenders, profile, evaluationTime],
   );
@@ -301,7 +286,6 @@ export function TenderExplorer({
     (completenessValues.filter(Boolean).length / completenessValues.length) *
       100,
   );
-  const sample = collectionMode === "sample";
 
   function exportShortlist() {
     const data = visible.map(({ tender, evaluation }) => ({
@@ -364,15 +348,11 @@ export function TenderExplorer({
         <>
           <div className="stats-grid">
             <StatCard
-              label="Relevant tenders"
+              label="Discovered tenders"
               value={ready ? tenders.length : null}
               icon="document"
               tone="neutral"
-              detail={
-                sample
-                  ? "Illustrative sample notices"
-                  : "From the latest source run"
-              }
+              detail="From the official IIIT-Delhi source"
             />
             <StatCard
               label="Meets checked conditions"
@@ -404,9 +384,8 @@ export function TenderExplorer({
               <span>
                 <strong>A few things have changed.</strong>
                 <small>
-                  {amendments}{" "}
-                  {sample ? "sample tenders have" : "tenders have visible"}{" "}
-                  amendments worth a closer look.
+                  {amendments} tenders have visible amendments worth a closer
+                  look.
                 </small>
               </span>
               <b>
@@ -598,7 +577,10 @@ export function TenderExplorer({
                         <StatusBadge status={evaluation.status} short />
                       </td>
                       <td className="cell-deadline" role="cell">
-                        <DeadlineCell tender={tender} />
+                        <DeadlineCell
+                          tender={tender}
+                          evaluationTime={evaluationTime}
+                        />
                       </td>
                       <td className="cell-actions" role="cell">
                         <div className="row-actions">
@@ -657,9 +639,10 @@ export function TenderExplorer({
             </span>
             <span>
               <Icon name="link" size={13} />
-              {sample
-                ? "Sample data · demo clock: 24 Oct 2026"
-                : "Live discovery · PDF checks pending"}
+              TinyFish snapshot ·{" "}
+              {new Date(catalogRetrievedAt).toLocaleDateString("en-GB", {
+                timeZone: "Asia/Kolkata",
+              })}
             </span>
           </div>
         </section>
@@ -721,13 +704,13 @@ export function TenderExplorer({
               </div>
               <p>
                 <span className="live-dot" />
-                {sample ? "Sample workspace active" : "Live snapshot available"}
+                Official source snapshot available
               </p>
               <Link className="text-link" href="/dashboard/sources">
                 Manage source <Icon name="arrowRight" size={14} />
               </Link>
             </section>
-            <RecentActivity job={job} tenders={tenders} sample={sample} />
+            <RecentActivity job={job} tenders={tenders} />
             <div className="workspace-footnote">
               <Icon name="shield" size={18} />
               <p>

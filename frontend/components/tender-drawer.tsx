@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DEMO_CLOCK, SAMPLE_CHANGES } from "@/lib/demo-data";
 import { evaluateTender } from "@/lib/rules";
 import type { Tender } from "@/lib/types";
 import { Icon } from "./icon";
@@ -18,12 +17,7 @@ export function TenderDrawer({
   const dialog = useRef<HTMLDialogElement>(null);
   const { profile, savedIds, toggleSaved, evaluationTime } = useWorkspace();
   const [tab, setTab] = useState("readiness");
-  const sample = tender.provenance === "sample";
-  const evaluation = evaluateTender(
-    tender,
-    profile,
-    new Date(sample ? DEMO_CLOCK : evaluationTime),
-  );
+  const evaluation = evaluateTender(tender, profile, new Date(evaluationTime));
   const deadline = tender.deadline ? new Date(tender.deadline) : null;
   const checkCounts = {
     meets: evaluation.findings.filter((finding) => finding.status === "meets")
@@ -34,9 +28,6 @@ export function TenderDrawer({
       (finding) => finding.status === "blocked",
     ).length,
   };
-  const changes = sample
-    ? SAMPLE_CHANGES.filter((change) => change.tenderId === tender.id)
-    : [];
 
   useEffect(() => {
     const element = dialog.current;
@@ -107,9 +98,7 @@ export function TenderDrawer({
               <dt>Estimated value</dt>
               <dd>
                 {tender.value}
-                <small>
-                  {sample ? "Illustrative" : "PDF extraction pending"}
-                </small>
+                <small>PDF extraction pending</small>
               </dd>
             </div>
             <div>
@@ -142,12 +131,11 @@ export function TenderDrawer({
             </button>
           </div>
         </div>
-        <div className={`provenance-banner ${sample ? "" : "provenance-live"}`}>
-          <Icon name={sample ? "help" : "globe"} size={16} />
+        <div className="provenance-banner provenance-live">
+          <Icon name="globe" size={16} />
           <span>
-            {sample
-              ? "Illustrative sample. Clauses, values, and pages are synthetic. Checked at the demo clock: 24 Oct 2026."
-              : "Collected live with TinyFish. PDF extraction and clause verification are pending; readiness is unresolved."}
+            Collected from the official source with TinyFish. PDF extraction and
+            clause verification are pending; readiness is unresolved.
           </span>
         </div>
         <div className="drawer-tabs" aria-label="Tender review sections">
@@ -162,7 +150,7 @@ export function TenderDrawer({
                 ? "Readiness checks"
                 : value === "evidence"
                   ? "Source evidence"
-                  : `Changes${changes.length ? ` (${changes.length})` : ""}`}
+                  : "Amendment links"}
             </button>
           ))}
         </div>
@@ -181,6 +169,18 @@ export function TenderDrawer({
                   readiness result.
                 </p>
               </div>
+            )}
+            {!evaluation.findings.length && (
+              <a
+                className="document-card"
+                href={tender.pdfUrls[0] ?? tender.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Icon name="document" size={22} />
+                Review the official tender document
+                <Icon name="arrow" size={17} />
+              </a>
             )}
             <div className="condition-list">
               {evaluation.findings.map((finding) => (
@@ -218,12 +218,12 @@ export function TenderDrawer({
                     <p>{finding.reason}</p>
                     <blockquote>“{finding.condition.quote}”</blockquote>
                     <a
-                      href={`/samples/${tender.id}#page-${finding.condition.page}`}
+                      href={`${tender.pdfUrls[0] ?? tender.sourceUrl}#page=${finding.condition.page}`}
                       target="_blank"
                       rel="noreferrer"
                     >
                       <Icon name="document" size={14} />
-                      Sample clause {finding.condition.clause} · page{" "}
+                      Source clause {finding.condition.clause} · page{" "}
                       {finding.condition.page}
                       <Icon name="arrow" size={13} />
                     </a>
@@ -247,41 +247,23 @@ export function TenderDrawer({
             <p className="muted">
               Evidence should be easy to inspect, not just easy to trust.
             </p>
-            {sample ? (
+            {tender.pdfUrls.map((url, index) => (
               <a
                 className="document-card"
-                href={`/samples/${tender.id}`}
+                key={url}
+                href={url}
                 target="_blank"
                 rel="noreferrer"
               >
-                <span className="document-card-icon">
-                  <Icon name="document" size={25} />
-                </span>
+                <Icon name="document" size={24} />
                 <span>
-                  <strong>Illustrative tender document</strong>
-                  <small>Synthetic clauses · physical page references</small>
+                  <strong>Source PDF {index + 1}</strong>
+                  <small>Official document · clause verification pending</small>
                 </span>
-                <Icon name="arrow" size={18} />
+                <Icon name="arrow" size={17} />
               </a>
-            ) : (
-              tender.pdfUrls.map((url, index) => (
-                <a
-                  className="document-card"
-                  key={url}
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Icon name="document" size={24} />
-                  <span>
-                    <strong>Source PDF {index + 1}</strong>
-                    <small>Live URL · extraction pending</small>
-                  </span>
-                  <Icon name="arrow" size={17} />
-                </a>
-              ))
-            )}
-            {!sample && !tender.pdfUrls.length && (
+            ))}
+            {!tender.pdfUrls.length && (
               <div className="inline-notice">
                 No PDF link was returned for this notice. Review the public
                 source.
@@ -304,10 +286,12 @@ export function TenderDrawer({
             </a>
             <div className="evidence-metadata">
               <div>
+                <span>Submission deadline (source text)</span>
+                <strong>{tender.deadlineText ?? "Not provided"}</strong>
+              </div>
+              <div>
                 <span>Collection mode</span>
-                <strong>
-                  {sample ? "Synthetic sample" : "TinyFish live discovery"}
-                </strong>
+                <strong>TinyFish source snapshot</strong>
               </div>
               <div>
                 <span>Observation time</span>
@@ -320,11 +304,7 @@ export function TenderDrawer({
               </div>
               <div>
                 <span>Verification</span>
-                <strong>
-                  {sample
-                    ? "Illustrative only"
-                    : "PDF clause verification pending"}
-                </strong>
+                <strong>PDF clause verification pending</strong>
               </div>
             </div>
           </div>
@@ -332,39 +312,27 @@ export function TenderDrawer({
         {tab === "changes" && (
           <div className="drawer-body">
             <h3>Every change, in context.</h3>
-            {changes.length ? (
-              changes.map((change) => (
-                <article className="change-detail" key={change.id}>
-                  <span className="eyebrow">
-                    SYNTHETIC AMENDMENT · {change.date}
-                  </span>
-                  <h4>{change.field}</h4>
-                  <div className="before-after">
-                    <div>
-                      <small>BEFORE</small>
-                      <span>{change.before}</span>
-                    </div>
-                    <Icon name="arrowRight" size={18} />
-                    <div>
-                      <small>AFTER</small>
-                      <strong>{change.after}</strong>
-                    </div>
-                  </div>
-                  <p>{change.detail}</p>
-                  <span className="muted">
-                    <Icon name="document" size={14} />
-                    {change.clause} · illustrative evidence
-                  </span>
-                </article>
+            {tender.amendmentUrls.length ? (
+              tender.amendmentUrls.map((url, index) => (
+                <a
+                  className="document-card"
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Icon name="document" size={20} />
+                  Amendment {index + 1} · comparison pending
+                  <Icon name="arrow" size={17} />
+                </a>
               ))
             ) : (
               <div className="empty-state">
                 <Icon name="history" size={30} />
-                <h3>No compared amendments yet.</h3>
+                <h3>No amendment links collected.</h3>
                 <p>
-                  {tender.amendmentUrls.length
-                    ? `${tender.amendmentUrls.length} amendment link(s) found. Document comparison is pending.`
-                    : "No change comparison is available for this notice."}
+                  Check the public source for any subsequent changes to this
+                  notice.
                 </p>
               </div>
             )}

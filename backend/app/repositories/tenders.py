@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.models.models import (
     AmendmentChange,
     Bookmark,
@@ -35,6 +36,9 @@ async def get_tenders(
         )
         .order_by(Tender.created_at.desc())
     )
+
+    if get_settings().TINYFISH_MODE == "live":
+        stmt = stmt.where(Tender.provenance == "live")
 
     if saved_only:
         stmt = stmt.join(

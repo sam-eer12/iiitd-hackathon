@@ -19,10 +19,11 @@ export default function ArchitecturePage() {
           <p className="reveal reveal-2">
             The complete TenderLens target architecture, generated with Mermaid
             Charts. The current build includes the landing page, interactive
-            dashboard, browser-persisted sample workspace, deterministic sample
-            checks, and a server-side TinyFish discovery adapter. FastAPI,
-            document extraction, durable workers, PostgreSQL, and AWS deployment
-            are planned.
+            dashboard with real TinyFish tender snapshots, browser-persisted
+            profiles and bookmarks, and a server-side discovery adapter. The
+            separate FastAPI backend provides persistence and worker modules;
+            connecting the dashboard to those endpoints and deploying to AWS
+            remain pending.
           </p>
         </div>
         <div className="architecture-summary reveal reveal-3">

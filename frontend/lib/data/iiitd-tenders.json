@@ -1,0 +1,63 @@
+{
+  "sourceUrl": "https://iiitd.ac.in/tenders",
+  "provider": "TinyFish",
+  "providerRunId": "ede19523-9671-401c-adea-a636d424907d",
+  "providerRunUrl": "https://agent.tinyfish.ai/runs/ede19523-9671-401c-adea-a636d424907d",
+  "retrievedAt": "2026-10-24T11:39:32Z",
+  "result": {
+    "outcome": "success",
+    "failure_reason": null,
+    "notices": [
+      {
+        "notice_id": "GEM/2026/B/8183492",
+        "title": "Supply and Installation of GPU Server at IIITD Campus",
+        "source_url": "https://iiitd.ac.in/tenders",
+        "deadline_text": "11th November 2026 at 3:00 PM",
+        "pdf_urls": [
+          "https://iiitd.ac.in/sites/default/files/docs/tenders/2026/GeM-Bidding-10061438.pdf"
+        ],
+        "amendment_urls": []
+      },
+      {
+        "notice_id": "IIT-D/IT/GPUs/020/2026-2027",
+        "title": "Supply and Installation of GPUs at IIITD",
+        "source_url": "https://iiitd.ac.in/tenders",
+        "deadline_text": "6th Nov 2026 at 3:00 PM",
+        "pdf_urls": [
+          "https://iiitd.ac.in/sites/default/files/docs/tenders/2026/Supply and Installation of GPUs-15-Oct-2026.pdf"
+        ],
+        "amendment_urls": []
+      },
+      {
+        "notice_id": "GEM/2026/B/8106278",
+        "title": "Tender for Supply and Installation of GPU server and NAS server at IIITD",
+        "source_url": "https://iiitd.ac.in/tenders",
+        "deadline_text": "22nd Oct 2026 at 1:00 PM",
+        "pdf_urls": [
+          "https://iiitd.ac.in/sites/default/files/docs/tenders/2026/GeM-Bidding-9972659 (1).pdf"
+        ],
+        "amendment_urls": []
+      },
+      {
+        "notice_id": "GEM/2026/B/8101290",
+        "title": "Supply and Installation of High end Workstations at IIIT-Delhi Campus",
+        "source_url": "https://iiitd.ac.in/tenders",
+        "deadline_text": "21st Oct 2026 at 12:00 Noon",
+        "pdf_urls": [
+          "https://iiitd.ac.in/sites/default/files/docs/tenders/2026/GeM-Bidding-9966995.pdf"
+        ],
+        "amendment_urls": []
+      },
+      {
+        "notice_id": "GEM/2026/B/8090109",
+        "title": "Supply and Installation of Desktops at IIIT-Delhi Campus",
+        "source_url": "https://iiitd.ac.in/tenders",
+        "deadline_text": "19th Oct 2026 at 11:00 AM",
+        "pdf_urls": [
+          "https://iiitd.ac.in/sites/default/files/docs/tenders/2026/GeM-Bidding-9954294.pdf"
+        ],
+        "amendment_urls": []
+      }
+    ]
+  }
+}
