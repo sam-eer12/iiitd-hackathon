@@ -220,7 +220,7 @@ async function updateDiscovery(id: string): Promise<StoredJob> {
       404,
     );
   if (job.status !== "running" || !job.providerRunId) return job;
-  if (job.lastPolledAt && Date.now() - Date.parse(job.lastPolledAt) < 10000)
+  if (job.lastPolledAt && Date.now() - Date.parse(job.lastPolledAt) < 5000)
     return job;
   const response = await providerRequest(
     `/v1/runs/${encodeURIComponent(job.providerRunId)}`,
