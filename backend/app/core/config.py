@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,8 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql+asyncpg://tenderlens:tenderlens_dev@127.0.0.1:5432/tenderlens"
     DATABASE_SCHEMA: str = "tenderlens_api"
+    DATABASE_SSL_CA_FILE: str | None = None
+    DATABASE_IAM_AUTH: bool = False
 
     FIREBASE_PROJECT_ID: str = "tenderlens-app-2026"
     FIREBASE_AUTH_EMULATOR_HOST: str | None = None
@@ -32,6 +35,15 @@ class Settings(BaseSettings):
     TINYFISH_API_KEY: str | None = None
     TINYFISH_BASE_URL: str = "https://agent.tinyfish.ai"
     TINYFISH_MODE: Literal["fixture", "live"] = "live"
+
+    # Inject server credentials at runtime; never expose them as NEXT_PUBLIC values.
+    SANDBOX_API_KEY: SecretStr | None = None
+    SANDBOX_API_SECRET: SecretStr | None = None
+    SANDBOX_ENVIRONMENT: Literal["test", "live"] = "test"
+    SANDBOX_RETURN_URL: str | None = None
+    DIGILOCKER_SIGNING_CERTIFICATE_PATH: str | None = None
+    ENTITYLOCKER_SIGNING_CERTIFICATE_PATH: str | None = None
+    CERTIFICATE_VERIFICATION_TTL_HOURS: int = 24
 
     MAX_PROVIDER_CONCURRENCY: int = 1
     TINYFISH_MAX_DURATION_SECONDS: int = 300

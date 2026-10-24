@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field
@@ -43,4 +44,4 @@ class ProfileResponse(BaseSchema):
 class ProfileUpdateRequest(BaseSchema):
     facts: SupplierFacts
     expected_version: int | None = None
-    provenance: str = "self-reported"
+    provenance: Literal["self-reported"] = "self-reported"

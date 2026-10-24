@@ -1,6 +1,7 @@
 """Database models package."""
 
 from app.models.base import Base, metadata_obj
+from app.models.certificates import CertificateVerification
 from app.models.models import (
     AmendmentChange,
     AuditEvent,
@@ -30,6 +31,7 @@ __all__ = [
     "Base",
     "Bookmark",
     "Condition",
+    "CertificateVerification",
     "Document",
     "DocumentVersion",
     "Evaluation",

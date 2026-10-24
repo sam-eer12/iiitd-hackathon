@@ -1,0 +1,607 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "TenderLens private PostgreSQL and network - demo defaults fit the AWS Free plan; production mode adds resilience",
+  "Metadata": {
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    }
+  },
+  "Parameters": {
+    "DeploymentMode": {
+      "Type": "String",
+      "Default": "demo",
+      "AllowedValues": [
+        "demo",
+        "production"
+      ]
+    },
+    "DatabaseIdentifier": {
+      "Type": "String",
+      "Default": "tenderlens-data-postgres",
+      "AllowedPattern": "[a-z][a-z0-9-]{0,62}"
+    },
+    "PostgresVersion": {
+      "Type": "String",
+      "Default": "18.6",
+      "AllowedPattern": "18\\.\\d+"
+    },
+    "DatabaseClass": {
+      "Type": "String",
+      "Default": "db.t4g.micro",
+      "AllowedValues": [
+        "db.t4g.micro",
+        "db.t4g.small",
+        "db.t4g.medium"
+      ]
+    },
+    "EvidenceBucket": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "ArtifactBucket": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "IntegrationSecret": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "DataKeyArn": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "BackendRepositoryUri": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "FrontendRepositoryUri": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "BackendRepositoryArn": {
+      "Type": "String",
+      "MinLength": 1
+    },
+    "FrontendRepositoryArn": {
+      "Type": "String",
+      "MinLength": 1
+    }
+  },
+  "Resources": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Dedicated network; no default-VPC dependency",
+          "must": []
+        }
+      },
+      "Properties": {
+        "CidrBlock": "10.42.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true
+      }
+    },
+    "Gateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Outbound access for build/deploy host and CloudFront VPC-origin prerequisite",
+          "must": []
+        }
+      },
+      "Properties": {}
+    },
+    "GatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Attach project gateway",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "Gateway"
+        }
+      }
+    },
+    "PublicRoutes": {
+      "Type": "AWS::EC2::RouteTable",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Outbound internet for EC2; databases have no internet route",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        }
+      }
+    },
+    "PublicDefaultRoute": {
+      "Type": "AWS::EC2::Route",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Avoid a NAT gateway for a small deployment",
+          "must": []
+        }
+      },
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "Gateway"
+        }
+      },
+      "DependsOn": "GatewayAttachment"
+    },
+    "PublicSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Separate availability zone for application and database placement",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "CidrBlock": "10.42.0.0/24",
+        "MapPublicIpOnLaunch": true
+      }
+    },
+    "PublicSubnet1Route": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Associate outbound route",
+          "must": []
+        }
+      },
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        }
+      }
+    },
+    "PrivateSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Separate availability zone for application and database placement",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "CidrBlock": "10.42.10.0/24",
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "PublicSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Separate availability zone for application and database placement",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "CidrBlock": "10.42.1.0/24",
+        "MapPublicIpOnLaunch": true
+      }
+    },
+    "PublicSubnet2Route": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Associate outbound route",
+          "must": []
+        }
+      },
+      "Properties": {
+        "SubnetId": {
+          "Ref": "PublicSubnet2"
+        },
+        "RouteTableId": {
+          "Ref": "PublicRoutes"
+        }
+      }
+    },
+    "PrivateSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Separate availability zone for application and database placement",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "CidrBlock": "10.42.11.0/24",
+        "MapPublicIpOnLaunch": false
+      }
+    },
+    "AppSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Host accepts application traffic only from the internal load balancer",
+          "must": [
+            "Never expose SSH or database ports"
+          ]
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "Application host - no public inbound access"
+      }
+    },
+    "DbSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "RDS has no public network path",
+          "must": [
+            "Only application security group may connect"
+          ]
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "PostgreSQL from application host only",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 5432,
+            "ToPort": 5432,
+            "SourceSecurityGroupId": {
+              "Ref": "AppSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "DbSubnets": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Database failover spans two availability zones",
+          "must": []
+        }
+      },
+      "Properties": {
+        "DBSubnetGroupDescription": "Isolated PostgreSQL subnets",
+        "SubnetIds": [
+          {
+            "Ref": "PrivateSubnet1"
+          },
+          {
+            "Ref": "PrivateSubnet2"
+          }
+        ]
+      }
+    },
+    "DbParameters": {
+      "Type": "AWS::RDS::DBParameterGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Enforce database TLS",
+          "must": [
+            "Keep rds.force_ssl enabled"
+          ]
+        }
+      },
+      "Properties": {
+        "Family": "postgres18",
+        "Description": "Require verified encrypted PostgreSQL connections",
+        "Parameters": {
+          "rds.force_ssl": "1"
+        }
+      }
+    },
+    "Database": {
+      "Type": "AWS::RDS::DBInstance",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Single authoritative PostgreSQL store with automatic AZ failover",
+          "must": [
+            "Retain on removal",
+            "Use managed master credentials only for bootstrap",
+            "Application uses a restricted IAM database role"
+          ]
+        }
+      },
+      "Properties": {
+        "DBInstanceIdentifier": {
+          "Ref": "DatabaseIdentifier"
+        },
+        "DBName": "tenderlens",
+        "Engine": "postgres",
+        "EngineVersion": {
+          "Ref": "PostgresVersion"
+        },
+        "DBInstanceClass": {
+          "Ref": "DatabaseClass"
+        },
+        "AllocatedStorage": "20",
+        "MaxAllocatedStorage": {
+          "Fn::If": [
+            "Production",
+            100,
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "StorageType": "gp3",
+        "MasterUsername": "tl_owner",
+        "ManageMasterUserPassword": true,
+        "MasterUserSecret": {
+          "KmsKeyId": {
+            "Ref": "DataKeyArn"
+          }
+        },
+        "StorageEncrypted": true,
+        "KmsKeyId": {
+          "Ref": "DataKeyArn"
+        },
+        "MultiAZ": {
+          "Fn::If": [
+            "Production",
+            true,
+            false
+          ]
+        },
+        "PubliclyAccessible": false,
+        "DBSubnetGroupName": {
+          "Ref": "DbSubnets"
+        },
+        "DBParameterGroupName": {
+          "Ref": "DbParameters"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "DbSecurityGroup"
+          }
+        ],
+        "Port": "5432",
+        "EnableIAMDatabaseAuthentication": true,
+        "BackupRetentionPeriod": {
+          "Fn::If": [
+            "Production",
+            7,
+            1
+          ]
+        },
+        "DeletionProtection": true,
+        "CopyTagsToSnapshot": true,
+        "AutoMinorVersionUpgrade": true,
+        "AllowMajorVersionUpgrade": false,
+        "EnablePerformanceInsights": {
+          "Fn::If": [
+            "Production",
+            true,
+            false
+          ]
+        },
+        "PerformanceInsightsRetentionPeriod": {
+          "Fn::If": [
+            "Production",
+            7,
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "PerformanceInsightsKMSKeyId": {
+          "Fn::If": [
+            "Production",
+            {
+              "Ref": "DataKeyArn"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "EnableCloudwatchLogsExports": [
+          "postgresql"
+        ],
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "TenderLens"
+          },
+          {
+            "Key": "created_by",
+            "Value": "rds-oss-skill"
+          },
+          {
+            "Key": "generation_model",
+            "Value": "gpt-6"
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    }
+  },
+  "Outputs": {
+    "Vpc": {
+      "Value": {
+        "Ref": "Vpc"
+      },
+      "Description": "Vpc identifier"
+    },
+    "PublicSubnet1": {
+      "Value": {
+        "Ref": "PublicSubnet1"
+      },
+      "Description": "PublicSubnet1 identifier"
+    },
+    "PublicSubnet2": {
+      "Value": {
+        "Ref": "PublicSubnet2"
+      },
+      "Description": "PublicSubnet2 identifier"
+    },
+    "PrivateSubnet1": {
+      "Value": {
+        "Ref": "PrivateSubnet1"
+      },
+      "Description": "PrivateSubnet1 identifier"
+    },
+    "PrivateSubnet2": {
+      "Value": {
+        "Ref": "PrivateSubnet2"
+      },
+      "Description": "PrivateSubnet2 identifier"
+    },
+    "AppSecurityGroup": {
+      "Value": {
+        "Ref": "AppSecurityGroup"
+      },
+      "Description": "AppSecurityGroup identifier"
+    },
+    "DatabaseHost": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "Endpoint.Address"
+        ]
+      },
+      "Description": "DatabaseHost for the service stack"
+    },
+    "DatabaseResourceId": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "DbiResourceId"
+        ]
+      },
+      "Description": "DatabaseResourceId for the service stack"
+    },
+    "DatabaseSecretArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Database",
+          "MasterUserSecret.SecretArn"
+        ]
+      },
+      "Description": "DatabaseSecretArn for the service stack"
+    },
+    "EvidenceBucket": {
+      "Value": {
+        "Ref": "EvidenceBucket"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "ArtifactBucket": {
+      "Value": {
+        "Ref": "ArtifactBucket"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "IntegrationSecret": {
+      "Value": {
+        "Ref": "IntegrationSecret"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "DataKeyArn": {
+      "Value": {
+        "Ref": "DataKeyArn"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "BackendRepositoryUri": {
+      "Value": {
+        "Ref": "BackendRepositoryUri"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "FrontendRepositoryUri": {
+      "Value": {
+        "Ref": "FrontendRepositoryUri"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "BackendRepositoryArn": {
+      "Value": {
+        "Ref": "BackendRepositoryArn"
+      },
+      "Description": "Storage-stack value for service deployment"
+    },
+    "FrontendRepositoryArn": {
+      "Value": {
+        "Ref": "FrontendRepositoryArn"
+      },
+      "Description": "Storage-stack value for service deployment"
+    }
+  },
+  "Conditions": {
+    "Production": {
+      "Fn::Equals": [
+        {
+          "Ref": "DeploymentMode"
+        },
+        "production"
+      ]
+    }
+  }
+}

@@ -44,6 +44,7 @@ def evaluate_condition(
     condition: dict[str, Any],
     profile: dict[str, Any],
     now: datetime,
+    verified_certificates: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Evaluate a single condition against a supplier profile at a given clock time.
     Returns a finding dict: {condition, status, reason, supplier_value}.
@@ -194,12 +195,19 @@ def evaluate_condition(
             }
 
         is_present = bool(val)
+        if is_present and cert_name not in verified_certificates:
+            return {
+                "condition": condition,
+                "status": "review",
+                "supplier_value": "Present · self-declared",
+                "reason": "The certificate is self-declared. An issuer verification is required before this check can pass.",
+            }
         return {
             "condition": condition,
             "status": "meets" if is_present else "blocked",
-            "supplier_value": "Present in profile" if is_present else "Confirmed absent",
+            "supplier_value": "Issuer verified" if is_present else "Confirmed absent",
             "reason": (
-                "Your profile declares this certificate is present. Verify the supporting document before bidding."
+                "The certificate has a current issuer verification matching this supplier."
                 if is_present
                 else "Your profile confirms that the required certificate is absent."
             ),
@@ -266,9 +274,10 @@ def evaluate_tender(
     conditions: list[dict[str, Any]],
     profile: dict[str, Any],
     now: datetime,
+    verified_certificates: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Aggregate evaluation over all conditions for a tender."""
-    findings = [evaluate_condition(c, profile, now) for c in conditions]
+    findings = [evaluate_condition(c, profile, now, verified_certificates) for c in conditions]
     unique_types = {c.get("type") for c in conditions}
     coverage_complete = len(unique_types) == 5
 

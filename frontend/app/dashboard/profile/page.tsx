@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import {
+  CertificateVerificationPanel,
+  CertificateDeclarationNote,
+  ProfileVerificationBadges,
+} from "@/components/certificate-verification-panel";
+import "@/app/styles/certificate-verification.css";
 import { Icon } from "@/components/icon";
 import { useWorkspace } from "@/components/workspace-provider";
 import type { SupplierProfile } from "@/lib/types";
@@ -177,8 +183,8 @@ function ProfileForm({
           <div>
             <h2>The details that open doors.</h2>
             <p>
-              Record what you know. An unknown certificate always stays for
-              review.
+              Record what you know. A declaration alone does not verify a
+              certificate; issuer checks are shown separately.
             </p>
           </div>
         </div>
@@ -214,19 +220,21 @@ function ProfileForm({
                 }
               >
                 <option value="unknown">Unknown / not confirmed</option>
-                <option value="present">Present</option>
+                <option value="present">Present · self-declared</option>
                 <option value="absent">Confirmed absent</option>
               </select>
+              <CertificateDeclarationNote kind={item.key} profile={draft} />
             </label>
           ))}
         </div>
+        <CertificateVerificationPanel profile={draft} dirty={dirty} />
       </div>
       <div className="form-footer">
         <span role="status">
           <Icon name={dirty ? "alert" : "shield"} size={16} />
           {dirty
             ? "You have unsaved changes."
-            : "Stored in this browser. Enter your current business facts."}
+            : "Enter your current business facts. Signed-in profiles sync to your account."}
         </span>
         <div className="form-footer-actions">
           {dirty && (
@@ -267,10 +275,12 @@ export default function ProfilePage() {
             A little detail today makes your next opportunity easier to assess.
           </p>
         </div>
-        <span className="subtle-tag">
-          <Icon name="building" size={14} />
-          Supplier profile
-        </span>
+        <div className="profile-heading-tags">
+          <ProfileVerificationBadges profile={profile} />
+          <span className="subtle-tag">
+            <Icon name="building" size={14} /> Supplier profile
+          </span>
+        </div>
       </div>
       {ready ? (
         <ProfileForm profile={profile} onSave={saveProfile} />

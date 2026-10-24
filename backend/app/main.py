@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     bookmarks,
+    catalog,
+    certificates,
     evidence,
     health,
     imports,
@@ -95,7 +97,9 @@ def create_app() -> FastAPI:
     # API v1 routes
     api_v1_prefix = "/api/v1"
     app.include_router(me.router, prefix=api_v1_prefix)
+    app.include_router(catalog.router, prefix=api_v1_prefix)
     app.include_router(profiles.router, prefix=api_v1_prefix)
+    app.include_router(certificates.router, prefix=api_v1_prefix)
     app.include_router(bookmarks.router, prefix=api_v1_prefix)
     app.include_router(sources.router, prefix=api_v1_prefix)
     app.include_router(refreshes.router, prefix=api_v1_prefix)

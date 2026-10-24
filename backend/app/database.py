@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
+from app.core.database import configure_iam_auth, connection_options
 
 settings = get_settings()
 
@@ -19,7 +20,9 @@ engine = create_async_engine(
     echo=(settings.LOG_LEVEL == "DEBUG"),
     future=True,
     poolclass=NullPool,
+    connect_args=connection_options(settings),
 )
+configure_iam_auth(engine, settings)
 
 async_session_factory = async_sessionmaker(
     bind=engine,

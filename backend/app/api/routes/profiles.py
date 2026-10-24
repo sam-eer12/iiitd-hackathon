@@ -49,7 +49,7 @@ async def update_profile(
     profile, version = await update_profile_facts(
         db,
         workspace_id=ctx.workspace_id,
-        facts=payload.facts.model_dump(),
+        facts=payload.facts.model_dump(by_alias=True),
         expected_version=expected_version,
         user_id=ctx.user_id,
         provenance=payload.provenance,

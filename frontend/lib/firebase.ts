@@ -5,11 +5,6 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import {
-  getDataConnect,
-  connectDataConnectEmulator,
-} from "firebase/data-connect";
-import { connectorConfig } from "@/lib/dataconnect";
 
 const firebaseConfig = {
   apiKey:
@@ -34,16 +29,6 @@ export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
-
-export const dataConnect = getDataConnect(app, connectorConfig);
-
-// If local emulator is running in dev mode
-if (
-  typeof window !== "undefined" &&
-  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true"
-) {
-  connectDataConnectEmulator(dataConnect, "localhost", 9399);
-}
 
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);

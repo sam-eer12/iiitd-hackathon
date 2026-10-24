@@ -211,6 +211,7 @@ export function TenderExplorer({
     notify,
     evaluationTime,
     catalogRetrievedAt,
+    verifiedCertificates,
     ready,
   } = useWorkspace();
   const [query, setQuery] = useState("");
@@ -242,9 +243,14 @@ export function TenderExplorer({
     () =>
       tenders.map((tender) => ({
         tender,
-        evaluation: evaluateTender(tender, profile, new Date(evaluationTime)),
+        evaluation: evaluateTender(
+          tender,
+          profile,
+          new Date(evaluationTime),
+          verifiedCertificates,
+        ),
       })),
-    [tenders, profile, evaluationTime],
+    [tenders, profile, evaluationTime, verifiedCertificates],
   );
   const counts = {
     meets: evaluated.filter((entry) => entry.evaluation.status === "meets")

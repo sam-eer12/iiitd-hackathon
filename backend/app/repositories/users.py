@@ -38,6 +38,11 @@ async def provision_user_and_workspace(
     display_name: str | None = None,
 ) -> tuple[User, Workspace]:
     """Idempotently provision a user and personal workspace."""
+    # A new login can concurrently load identity, profile and verification routes.
+    # Serialize provisioning per Firebase subject before testing for existence.
+    await db.execute(
+        sa.text("SELECT pg_advisory_xact_lock(hashtextextended(:uid, 0))"), {"uid": firebase_uid}
+    )
     user = await get_user_by_firebase_uid(db, firebase_uid)
     now = datetime.now(UTC)
 

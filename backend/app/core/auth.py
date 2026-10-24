@@ -70,8 +70,25 @@ def verify_id_token(token: str) -> Principal:
             )
 
     try:
-        init_firebase_app()
-        decoded = firebase_auth.verify_id_token(token)
+        if settings.GOOGLE_APPLICATION_CREDENTIALS or settings.FIREBASE_AUTH_EMULATOR_HOST:
+            init_firebase_app()
+            decoded = firebase_auth.verify_id_token(token)
+        else:
+            # Public signing certificates verify Firebase ID tokens on AWS without
+            # provisioning a Google service-account private key or Cloud SQL.
+            from google.auth.transport.requests import Request
+            from google.oauth2.id_token import verify_firebase_token
+
+            decoded = verify_firebase_token(token, Request(), audience=settings.FIREBASE_PROJECT_ID)
+            if (
+                decoded.get("iss")
+                != f"https://securetoken.google.com/{settings.FIREBASE_PROJECT_ID}"
+            ):
+                raise ValueError("Invalid Firebase token issuer")
+            subject = decoded.get("sub")
+            if not isinstance(subject, str) or not subject or len(subject) > 128:
+                raise ValueError("Invalid Firebase token subject")
+            decoded["uid"] = subject
         return Principal(
             uid=decoded["uid"],
             email=decoded.get("email"),
@@ -79,5 +96,5 @@ def verify_id_token(token: str) -> Principal:
             claims=decoded,
         )
     except Exception as exc:
-        logger.warning("Token verification failed: %s", exc)
-        raise AuthenticationError(f"Token verification failed: {exc}")
+        logger.warning("Token verification failed (%s)", type(exc).__name__)
+        raise AuthenticationError("Token verification failed.") from exc

@@ -1,3 +1,5 @@
+import { remoteWorkspace } from "@/lib/backend-proxy";
+import { remoteDiscovery } from "@/lib/remote-discovery";
 import type { NextRequest } from "next/server";
 import {
   DiscoveryError,
@@ -13,6 +15,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    if (remoteWorkspace()) return remoteDiscovery(request, id);
     if (
       !verifyJobSignature(
         id,

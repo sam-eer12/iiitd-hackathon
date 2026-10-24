@@ -1,0 +1,53 @@
+/* Decorative film grain stays behind the existing landing page content. */
+.landing:has(> .background-grain) {
+  isolation: isolate;
+}
+
+.background-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.background-grain > svg {
+  position: absolute;
+  top: -12%;
+  left: -12%;
+  width: 124%;
+  height: 124%;
+  opacity: 0.055;
+  animation: background-grain-shift 0.8s steps(6) infinite;
+  will-change: transform;
+}
+
+@keyframes background-grain-shift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  16% {
+    transform: translate(-3%, 2%);
+  }
+  32% {
+    transform: translate(2%, -3%);
+  }
+  48% {
+    transform: translate(-1%, 4%);
+  }
+  64% {
+    transform: translate(4%, 1%);
+  }
+  80% {
+    transform: translate(-2%, -2%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background-grain > svg {
+    animation: none;
+    transform: none;
+    will-change: auto;
+  }
+}

@@ -21,6 +21,7 @@ from app.models.models import (
     ParseArtifact,
 )
 from app.repositories.bookmarks import get_bookmarked_tender_ids
+from app.repositories.certificates import verified_certificate_types
 from app.repositories.profiles import get_profile_by_workspace
 from app.repositories.tenders import (
     get_tender_amendments,
@@ -65,6 +66,9 @@ async def list_tenders(
     profile_pair = await get_profile_by_workspace(db, ctx.workspace_id)
     profile_facts = profile_pair[1].facts if profile_pair else {}
     now = system_clock.now()
+    verified_certificates = await verified_certificate_types(
+        db, ctx.workspace_id, profile_facts.get("company", ""), now
+    )
 
     items: list[TenderSchema] = []
     for t in tenders:
@@ -95,6 +99,7 @@ async def list_tenders(
             [c.model_dump() for c in cond_schemas],
             profile_facts,
             now=now,
+            verified_certificates=verified_certificates,
         )
 
         findings_schemas = [
@@ -189,6 +194,9 @@ async def get_tender_detail(
         [c.model_dump() for c in cond_schemas],
         profile_facts,
         now=now,
+        verified_certificates=await verified_certificate_types(
+            db, ctx.workspace_id, profile_facts.get("company", ""), now
+        ),
     )
 
     findings_schemas = [

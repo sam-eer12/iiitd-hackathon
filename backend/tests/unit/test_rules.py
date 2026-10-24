@@ -182,6 +182,8 @@ def test_all_five_evidenced_checks_pass_for_aggregate_meets():
             "deadline": "2026-11-06T15:00:00+05:30",
         },
     ]
-    result = evaluate_tender(conditions, PROFILE, EVAL_CLOCK)
+    result = evaluate_tender(
+        conditions, PROFILE, EVAL_CLOCK, verified_certificates=frozenset({"gst"})
+    )
     assert result["status"] == "meets"
     assert result["coverage_complete"] is True
