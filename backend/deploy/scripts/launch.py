@@ -53,6 +53,8 @@ if os.environ.get("SKIP_MIGRATIONS") != "1":
         "-e",
         "DATABASE_HOST",
         "-e",
+        "AWS_REGION",
+        "-e",
         "BOOTSTRAP_USERNAME",
         "-e",
         "BOOTSTRAP_PASSWORD",

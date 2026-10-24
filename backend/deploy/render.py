@@ -478,6 +478,12 @@ def service():
     parameters = {name: {"Type": "String", "MinLength": 1} for name in parameter_names}
     parameters.update(
         {
+            "EnablePublicEdge": {
+                "Type": "String",
+                "Default": "false",
+                "AllowedValues": ["false", "true"],
+                "Description": "Enable after AWS approves CloudFront account verification",
+            },
             "ConnectionArn": {
                 "Type": "String",
                 "AllowedPattern": r"arn:aws:codeconnections:.*:connection/.*",
@@ -504,6 +510,7 @@ def service():
         "TenderLens containers and CI/CD - preserve Next.js 16 with private CloudFront ingress and EC2 API/worker",
         parameters,
     )
+    t["Conditions"] = {"PublicEdge": {"Fn::Equals": [R("EnablePublicEdge"), "true"]}}
     resource(
         t,
         "Logs",
@@ -736,6 +743,7 @@ fi
         },
         "Private CloudFront-to-ALB connectivity",
         DependsOn="Listener",
+        Condition="PublicEdge",
     )
     resource(
         t,
@@ -771,6 +779,7 @@ fi
         },
         "Managed HTTPS endpoint without requiring a custom domain; Next.js handles caching",
         ["Never cache authenticated responses", "Forward viewer Host for same-origin checks"],
+        Condition="PublicEdge",
     )
     role(
         t,
@@ -1012,6 +1021,13 @@ fi
         "WebsiteUrl",
         S("https://${Distribution.DomainName}"),
         "Actual AWS-provisioned HTTPS website URL",
+    )
+    t["Outputs"]["WebsiteUrl"]["Condition"] = "PublicEdge"
+    output(
+        t,
+        "PublicEdgeEnabled",
+        R("EnablePublicEdge"),
+        "Public HTTPS requires CloudFront account verification",
     )
     output(t, "PipelineName", R("Pipeline"), "Pipeline for main-branch deployments")
     output(t, "HostRoleArn", A("HostRole", "Arn"), "Runtime IAM role")

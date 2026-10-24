@@ -5,15 +5,17 @@ import os
 import ssl
 
 import asyncpg
+import boto3
 
 
 async def main():
+    tls = ssl.create_default_context(cafile="/app/certs/rds-ca.pem")
     connection = await asyncpg.connect(
         host=os.environ["DATABASE_HOST"],
         database="tenderlens",
         user=os.environ["BOOTSTRAP_USERNAME"],
         password=os.environ["BOOTSTRAP_PASSWORD"],
-        ssl=ssl.create_default_context(cafile="/app/certs/rds-ca.pem"),
+        ssl=tls,
     )
     try:
         async with connection.transaction():
@@ -24,6 +26,22 @@ async def main():
                 await connection.execute(f"GRANT rds_iam TO {name}")
             await connection.execute("GRANT CONNECT ON DATABASE tenderlens TO tl_app, tl_migrator")
             await connection.execute("GRANT CREATE ON DATABASE tenderlens TO tl_migrator")
+    finally:
+        await connection.close()
+    # Keep the password-managed master outside IAM-authenticated role membership.
+    client = boto3.client("rds", region_name=os.environ["AWS_REGION"])
+    token = client.generate_db_auth_token(
+        DBHostname=os.environ["DATABASE_HOST"], Port=5432, DBUsername="tl_migrator"
+    )
+    connection = await asyncpg.connect(
+        host=os.environ["DATABASE_HOST"],
+        database="tenderlens",
+        user="tl_migrator",
+        password=token,
+        ssl=tls,
+    )
+    try:
+        async with connection.transaction():
             await connection.execute(
                 "CREATE SCHEMA IF NOT EXISTS tenderlens_api AUTHORIZATION tl_migrator"
             )

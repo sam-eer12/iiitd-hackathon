@@ -16,10 +16,11 @@ parser.add_argument("--profile", default="tenderlens")
 parser.add_argument("--region", default="ap-south-1")
 parser.add_argument("--mode", choices=["demo", "production"], default="demo")
 parser.add_argument("--connection-arn")
+parser.add_argument("--enable-public-edge", action="store_true")
 args = parser.parse_args()
 session = boto3.Session(profile_name=args.profile, region_name=args.region)
 cf = session.client("cloudformation")
-names = {"storage": "tenderlens-storage", "data": "tenderlens-db", "service": "tenderlens-web"}
+names = {"storage": "tenderlens-storage", "data": "tenderlens-db", "service": "tenderlens-app"}
 body = json.loads((Path(__file__).parent / "templates" / f"{args.stack}.json").read_text())
 
 
@@ -52,6 +53,8 @@ if args.stack == "service":
     if connection["ConnectionStatus"] != "AVAILABLE":
         raise SystemExit("Complete GitHub OAuth for the CodeConnection before deploying.")
     values["ConnectionArn"] = args.connection_arn
+    if args.enable_public_edge:
+        values["EnablePublicEdge"] = "true"
     prefix = session.client("ec2").describe_managed_prefix_lists(
         Filters=[
             {

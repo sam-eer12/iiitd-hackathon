@@ -39,7 +39,7 @@ a demo topology, not a highly available application tier.
    encrypted database logs, and server-only provider configuration.
 2. `data.json`: VPC, subnets, security groups, TLS parameter group, and RDS PostgreSQL.
 3. `service.json`: EC2/SSM, internal ALB, CloudFront VPC origin, and CI/CD roles/services
-   in the `tenderlens-web` stack.
+   in the `tenderlens-app` stack.
 
 CodeConnections → CodePipeline V2 (`QUEUED`) → CodeBuild → ECR → native CodePipeline EC2 deployment over SSM.
 The `main` branch runs backend lint/migrations/tests/benchmark, frontend quality
@@ -69,7 +69,9 @@ uv run python deploy/manage.py storage
 storage first, data second, then service with `--connection-arn <available-connection-arn>`.
 The data helper queries currently available PostgreSQL 18 releases. CodeConnections
 OAuth must be completed in the AWS console once; subsequent main pushes deploy
-automatically. The helper never deletes stacks or retrieves secret values.
+automatically. The helper never deletes stacks or retrieves secret values. Public hosting defaults
+to disabled: after AWS Support verifies the account for CloudFront, apply the service
+stack with `--enable-public-edge` to provision its HTTPS endpoint.
 
 During initial deployment, the production RDS attempt was rejected by the Free
 account plan. Its network rolled back and no database was created. The retained
@@ -77,7 +79,9 @@ storage was imported into `tenderlens-storage` and reused; the failed original
 `tenderlens-data` stack remains as an audit record. No pre-existing project data was
 deleted or migrated from a local database. The first service stack, `tenderlens-service`,
 failed because CodeDeploy requires an unavailable subscription; it has no running host.
-The replacement `tenderlens-web` stack uses the supported native EC2 deployment action.
+A second attempt, `tenderlens-web`, rolled back because AWS requires account verification
+for CloudFront distributions. `tenderlens-app` uses the native EC2 action and defaults
+to private hosting until that verification is complete.
 
 ## Provider setup and operations
 
