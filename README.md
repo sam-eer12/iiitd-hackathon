@@ -63,6 +63,7 @@ GitHub Actions runs on pushes, pull requests, and manual dispatches. It uses Nod
 - [Architecture and integration contracts](docs/ARCHITECTURE.md)
 - [Full architecture Mermaid source](docs/architecture.mmd)
 - [24-hour implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Detailed backend implementation plan](backend/IMPLEMENTATION_PLAN.md)
 - [Current build status and verification](docs/BUILD_STATUS.md)
 
 Based on the TenderLens pitch for HackIIITD 2026, Team IDK.
