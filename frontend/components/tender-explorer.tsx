@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DEMO_CLOCK } from "@/lib/demo-data";
+import { DEMO_CLOCK, SAMPLE_CHANGES } from "@/lib/demo-data";
 import { evaluateTender } from "@/lib/rules";
-import type { Readiness, Tender } from "@/lib/types";
+import type { DiscoveryJob, Readiness, Tender } from "@/lib/types";
 import { Icon, type IconName } from "./icon";
 import { StatusBadge } from "./status-badge";
 import { TenderDrawer } from "./tender-drawer";
@@ -18,7 +18,7 @@ function StatCard({
   detail,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   icon: IconName;
   tone: string;
   detail: string;
@@ -31,12 +31,176 @@ function StatCard({
           <Icon name={icon} size={18} />
         </span>
       </div>
-      <strong>{String(value).padStart(2, "0")}</strong>
+      <strong aria-busy={value === null}>
+        {value === null ? "—" : String(value).padStart(2, "0")}
+      </strong>
       <p>
         <span className="stat-dot" />
         {detail}
       </p>
     </div>
+  );
+}
+
+function DeadlineCell({ tender }: { tender: Tender }) {
+  if (tender.deadline) {
+    const deadline = new Date(tender.deadline);
+    return (
+      <>
+        <span className="deadline-date">
+          {deadline.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            timeZone: "Asia/Kolkata",
+          })}
+        </span>
+        <span className="deadline-time">
+          {deadline.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: "Asia/Kolkata",
+          })}{" "}
+          IST
+        </span>
+      </>
+    );
+  }
+  if (tender.deadlineText)
+    return (
+      <>
+        <span className="deadline-text" title={tender.deadlineText}>
+          {tender.deadlineText}
+        </span>
+        <span className="deadline-time">As listed · verify source</span>
+      </>
+    );
+  return (
+    <>
+      <span className="deadline-date">Unconfirmed</span>
+      <span className="deadline-time">Verify source</span>
+    </>
+  );
+}
+
+const timeFormat: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "Asia/Kolkata",
+};
+
+/* Recent workspace events, built only from existing records: the latest
+   source run and the amendment records (sample ones stay labelled). */
+function RecentActivity({
+  job,
+  tenders,
+  sample,
+}: {
+  job: DiscoveryJob | null;
+  tenders: Tender[];
+  sample: boolean;
+}) {
+  const items: {
+    id: string;
+    href: string;
+    tone: "meets" | "review" | "blocked" | "info";
+    title: string;
+    detail: string;
+  }[] = [];
+  if (job) {
+    const when = new Date(job.finishedAt ?? job.createdAt).toLocaleString(
+      "en-GB",
+      timeFormat,
+    );
+    const run = {
+      completed: {
+        tone: "meets",
+        title: "Source run completed",
+        detail: `${job.tenders?.length ?? 0} notices · ${when} IST`,
+      },
+      running: {
+        tone: "info",
+        title: "Source run in progress",
+        detail: `Started ${when} IST`,
+      },
+      submitting: {
+        tone: "info",
+        title: "Source run starting",
+        detail: `Started ${when} IST`,
+      },
+      failed: {
+        tone: "blocked",
+        title: "Source run failed",
+        detail: `${when} IST`,
+      },
+      cancelled: {
+        tone: "review",
+        title: "Source run cancelled",
+        detail: `${when} IST`,
+      },
+      submission_unknown: {
+        tone: "review",
+        title: "Source run needs reconciliation",
+        detail: `${when} IST`,
+      },
+    }[job.status] as {
+      tone: "meets" | "review" | "blocked" | "info";
+      title: string;
+      detail: string;
+    };
+    items.push({ id: job.id, href: "/dashboard/sources", ...run });
+  }
+  if (sample)
+    for (const change of SAMPLE_CHANGES) {
+      const tender = tenders.find((item) => item.id === change.tenderId);
+      items.push({
+        id: change.id,
+        href: "/dashboard/amendments",
+        tone: "review",
+        title: change.field,
+        detail: `${tender?.title ?? "Sample tender"} · ${change.date} · synthetic`,
+      });
+    }
+  else
+    for (const tender of tenders.filter((item) => item.amendmentUrls.length))
+      items.push({
+        id: `amendments-${tender.id}`,
+        href: "/dashboard/amendments",
+        tone: "review",
+        title: "Amendment links found",
+        detail: `${tender.title} · not yet compared`,
+      });
+  return (
+    <section className="activity-card" aria-labelledby="activity-heading">
+      <div className="aside-card-heading">
+        <span className="eyebrow" id="activity-heading">
+          RECENT ACTIVITY
+        </span>
+        <Icon name="activity" size={16} />
+      </div>
+      {items.length ? (
+        <ol className="activity-list">
+          {items.slice(0, 4).map((item) => (
+            <li key={item.id}>
+              <Link href={item.href}>
+                <span className={`activity-dot activity-${item.tone}`} />
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.detail}</small>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="activity-empty">
+          No source runs or amendments yet. Run live discovery from Connected
+          sources.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -56,6 +220,7 @@ export function TenderExplorer({
     notify,
     evaluationTime,
     collectionMode,
+    ready,
   } = useWorkspace();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | Readiness>("all");
@@ -177,9 +342,10 @@ export function TenderExplorer({
           </p>
         </div>
         <button
-          className="button button-dark button-small"
+          className="button button-primary button-small"
           onClick={() => void refresh()}
           disabled={isRunning}
+          aria-busy={isRunning}
         >
           <Icon name="refresh" size={16} className={isRunning ? "spin" : ""} />
           {isRunning ? "Checking source…" : "Refresh tenders"}
@@ -199,7 +365,7 @@ export function TenderExplorer({
           <div className="stats-grid">
             <StatCard
               label="Relevant tenders"
-              value={tenders.length}
+              value={ready ? tenders.length : null}
               icon="document"
               tone="neutral"
               detail={
@@ -210,21 +376,21 @@ export function TenderExplorer({
             />
             <StatCard
               label="Meets checked conditions"
-              value={counts.meets}
+              value={ready ? counts.meets : null}
               icon="checkCircle"
               tone="green"
               detail="A promising place to start"
             />
             <StatCard
               label="Review needed"
-              value={counts.review}
+              value={ready ? counts.review : null}
               icon="clock"
               tone="amber"
               detail="A few details to look into"
             />
             <StatCard
               label="Blocked"
-              value={counts.blocked}
+              value={ready ? counts.blocked : null}
               icon="shield"
               tone="red"
               detail="Know your blockers early"
@@ -286,7 +452,7 @@ export function TenderExplorer({
               <kbd>/</kbd>
             </label>
             <button
-              className={`button button-outline button-small ${showFilters ? "button-selected" : ""}`}
+              className={`button button-secondary button-small ${showFilters ? "button-selected" : ""}`}
               aria-expanded={showFilters}
               onClick={() => setShowFilters(!showFilters)}
             >
@@ -360,104 +526,105 @@ export function TenderExplorer({
             </label>
           </div>
           <div className="table-scroll">
-            <table className="tender-table">
-              <thead>
-                <tr>
-                  <th>TENDER / OPPORTUNITY</th>
-                  <th>READINESS</th>
-                  <th>CLOSING DATE</th>
-                  <th>
+            <table className="tender-table" role="table">
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader">Tender / opportunity</th>
+                  <th role="columnheader">Readiness</th>
+                  <th role="columnheader">Closing date</th>
+                  <th role="columnheader">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                {visible.map(({ tender, evaluation }) => (
-                  <tr key={tender.id}>
-                    <td>
-                      <div className="tender-title-cell">
-                        <span
-                          className={`tender-category-icon category-${tender.category === "Electronics" ? "electronics" : tender.category === "IT equipment" ? "it" : "lab"}`}
-                        >
-                          <Icon
-                            name={
-                              tender.category === "IT equipment"
-                                ? "grid"
-                                : tender.category === "Electronics"
-                                  ? "activity"
-                                  : "document"
-                            }
-                            size={19}
-                          />
-                        </span>
-                        <div>
-                          <button
-                            className="tender-title"
-                            onClick={() => setSelected(tender)}
+              <tbody role="rowgroup" aria-busy={!ready}>
+                {!ready &&
+                  [0, 1, 2].map((row) => (
+                    <tr key={`loading-${row}`} className="skeleton-row">
+                      <td className="cell-title">
+                        <span className="skeleton skeleton-title" />
+                        <span className="skeleton skeleton-meta" />
+                      </td>
+                      <td className="cell-status">
+                        <span className="skeleton skeleton-badge" />
+                      </td>
+                      <td className="cell-deadline">
+                        <span className="skeleton skeleton-date" />
+                      </td>
+                      <td className="cell-actions" />
+                    </tr>
+                  ))}
+                {ready &&
+                  visible.map(({ tender, evaluation }) => (
+                    <tr key={tender.id} role="row">
+                      <td className="cell-title" role="cell">
+                        <div className="tender-title-cell">
+                          <span
+                            className={`tender-category-icon category-${tender.category === "Electronics" ? "electronics" : tender.category === "IT equipment" ? "it" : "lab"}`}
                           >
-                            {tender.title}
-                          </button>
-                          <div className="tender-meta">
-                            <span>{tender.category}</span>
-                            <i />
-                            {tender.reference}
-                            {tender.amended && (
-                              <span className="amended-label">
-                                <Icon name="history" size={11} />
-                                Amended
-                              </span>
-                            )}
+                            <Icon
+                              name={
+                                tender.category === "IT equipment"
+                                  ? "grid"
+                                  : tender.category === "Electronics"
+                                    ? "activity"
+                                    : "document"
+                              }
+                              size={19}
+                            />
+                          </span>
+                          <div>
+                            <button
+                              className="tender-title"
+                              onClick={() => setSelected(tender)}
+                            >
+                              {tender.title}
+                            </button>
+                            <div className="tender-meta">
+                              <span>{tender.category}</span>
+                              <i />
+                              {tender.reference}
+                              {tender.amended && (
+                                <span className="amended-label">
+                                  <Icon name="history" size={11} />
+                                  Amended
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <StatusBadge status={evaluation.status} short />
-                    </td>
-                    <td>
-                      <span className="deadline-date">
-                        {tender.deadline
-                          ? new Date(tender.deadline).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                timeZone: "Asia/Kolkata",
-                              },
-                            )
-                          : "Unconfirmed"}
-                      </span>
-                      <span className="deadline-time">
-                        {tender.provenance === "sample"
-                          ? "3:00 PM IST"
-                          : "Verify source"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className={`icon-button save-button ${savedIds.includes(tender.id) ? "is-saved" : ""}`}
-                          onClick={() => toggleSaved(tender.id)}
-                          aria-label={`${savedIds.includes(tender.id) ? "Unsave" : "Save"} ${tender.title}`}
-                          aria-pressed={savedIds.includes(tender.id)}
-                        >
-                          <Icon name="bookmark" size={17} />
-                        </button>
-                        <button
-                          className="icon-button"
-                          onClick={() => setSelected(tender)}
-                          aria-label={`Review ${tender.title}`}
-                        >
-                          <Icon name="chevron" size={17} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="cell-status" role="cell">
+                        <StatusBadge status={evaluation.status} short />
+                      </td>
+                      <td className="cell-deadline" role="cell">
+                        <DeadlineCell tender={tender} />
+                      </td>
+                      <td className="cell-actions" role="cell">
+                        <div className="row-actions">
+                          <button
+                            className={`icon-button save-button ${savedIds.includes(tender.id) ? "is-saved" : ""}`}
+                            onClick={() => toggleSaved(tender.id)}
+                            aria-label={`${savedIds.includes(tender.id) ? "Unsave" : "Save"} ${tender.title}`}
+                            aria-pressed={savedIds.includes(tender.id)}
+                          >
+                            <Icon name="bookmark" size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            onClick={() => setSelected(tender)}
+                            aria-label={`Review ${tender.title}`}
+                          >
+                            <Icon name="chevron" size={17} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
-          {!visible.length && (
+          {ready && !visible.length && (
             <div className="empty-state">
               <Icon name={mode === "saved" ? "bookmark" : "search"} size={32} />
               <h3>
@@ -471,7 +638,7 @@ export function TenderExplorer({
                   : "Try another search or reset your filters."}
               </p>
               <button
-                className="button button-outline button-small"
+                className="button button-secondary button-small"
                 onClick={() => {
                   setQuery("");
                   setCategory("all");
@@ -483,8 +650,10 @@ export function TenderExplorer({
             </div>
           )}
           <div className="table-footer">
-            <span>
-              Showing {visible.length} of {base.length} tenders
+            <span role="status">
+              {ready
+                ? `Showing ${visible.length} of ${base.length} tenders`
+                : "Loading your workspace…"}
             </span>
             <span>
               <Icon name="link" size={13} />
@@ -533,7 +702,7 @@ export function TenderExplorer({
               </div>
               <Link
                 href="/dashboard/profile"
-                className="button button-outline button-small"
+                className="button button-secondary button-small"
               >
                 Review profile <Icon name="arrowRight" size={15} />
               </Link>
@@ -558,6 +727,7 @@ export function TenderExplorer({
                 Manage source <Icon name="arrowRight" size={14} />
               </Link>
             </section>
+            <RecentActivity job={job} tenders={tenders} sample={sample} />
             <div className="workspace-footnote">
               <Icon name="shield" size={18} />
               <p>
