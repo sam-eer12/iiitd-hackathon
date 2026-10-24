@@ -1,0 +1,301 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "TenderLens demo HTTPS entry point to the private application ALB",
+  "Metadata": {
+    "AWSToolsMetrics": {
+      "AWSAgentToolkit": "aws-cloudformation@3"
+    }
+  },
+  "Parameters": {
+    "Vpc": {
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "Subnets": {
+      "Type": "List<AWS::EC2::Subnet::Id>"
+    },
+    "AlbSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "OriginDns": {
+      "Type": "String"
+    },
+    "DataKeyArn": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Encrypted request execution logs; do not log request payloads",
+          "must": []
+        }
+      },
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}"
+        },
+        "RetentionInDays": 30,
+        "KmsKeyId": {
+          "Ref": "DataKeyArn"
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "ProxyGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Proxy can only connect to the private application ALB",
+          "must": []
+        }
+      },
+      "Properties": {
+        "VpcId": {
+          "Ref": "Vpc"
+        },
+        "GroupDescription": "HTTPS demo proxy to private ALB only",
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "DestinationSecurityGroupId": {
+              "Ref": "AlbSecurityGroup"
+            }
+          }
+        ]
+      }
+    },
+    "AlbIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Allow only this proxy into the private ALB",
+          "must": []
+        }
+      },
+      "Properties": {
+        "GroupId": {
+          "Ref": "AlbSecurityGroup"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": 80,
+        "ToPort": 80,
+        "SourceSecurityGroupId": {
+          "Ref": "ProxyGroup"
+        }
+      }
+    },
+    "Role": {
+      "Type": "AWS::IAM::Role",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Service-specific permissions for this deployment",
+          "must": [
+            "Scope data access to project resources"
+          ]
+        }
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [],
+        "Policies": [
+          {
+            "PolicyName": "project-access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DescribeSubnets",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:AssignPrivateIpAddresses",
+                    "ec2:UnassignPrivateIpAddresses"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Logs",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Proxy": {
+      "Type": "AWS::Lambda::Function",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Public browser HTTPS only; app mutations retain Firebase authentication",
+          "must": []
+        }
+      },
+      "Properties": {
+        "FunctionName": {
+          "Ref": "AWS::StackName"
+        },
+        "Runtime": "python3.13",
+        "Handler": "index.handler",
+        "Role": {
+          "Fn::GetAtt": [
+            "Role",
+            "Arn"
+          ]
+        },
+        "MemorySize": 512,
+        "Timeout": 120,
+        "Architectures": [
+          "arm64"
+        ],
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "Logs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "ORIGIN_DNS": {
+              "Ref": "OriginDns"
+            }
+          }
+        },
+        "VpcConfig": {
+          "SubnetIds": {
+            "Ref": "Subnets"
+          },
+          "SecurityGroupIds": [
+            {
+              "Ref": "ProxyGroup"
+            }
+          ]
+        },
+        "Code": {
+          "ZipFile": "\"\"\"HTTPS demo entry point to the private application load balancer.\"\"\"\n\nimport base64\nimport http.client\nimport os\n\nHOP_HEADERS = {\"connection\", \"transfer-encoding\", \"keep-alive\", \"content-length\", \"upgrade\"}\n\n\ndef handler(event, context):\n    request = event.get(\"requestContext\", {})\n    method = request.get(\"http\", {}).get(\"method\", \"GET\")\n    path = event.get(\"rawPath\", \"/\")\n    if not path.startswith(\"/\"):\n        return {\"statusCode\": 400, \"body\": \"Invalid request path\"}\n    query = event.get(\"rawQueryString\", \"\")\n    if query:\n        path += \"?\" + query\n    headers = {\n        key: value\n        for key, value in event.get(\"headers\", {}).items()\n        if key.lower() not in HOP_HEADERS\n        and key.lower() not in {\"host\", \"x-forwarded-host\", \"x-forwarded-proto\"}\n    }\n    host = request[\"domainName\"]\n    headers.update({\"Host\": host, \"X-Forwarded-Host\": host, \"X-Forwarded-Proto\": \"https\"})\n    if event.get(\"cookies\"):\n        headers[\"Cookie\"] = \"; \".join(event[\"cookies\"])\n    body = event.get(\"body\")\n    if body is not None:\n        body = base64.b64decode(body) if event.get(\"isBase64Encoded\") else body.encode()\n    connection = http.client.HTTPConnection(os.environ[\"ORIGIN_DNS\"], 80, timeout=110)\n    try:\n        connection.request(method, path, body=body, headers=headers)\n        response = connection.getresponse()\n        data = response.read()\n        pairs = response.getheaders()\n        return {\n            \"statusCode\": response.status,\n            \"headers\": {\n                key: value\n                for key, value in pairs\n                if key.lower() not in HOP_HEADERS | {\"set-cookie\"}\n            },\n            \"cookies\": [value for key, value in pairs if key.lower() == \"set-cookie\"],\n            \"body\": base64.b64encode(data).decode(),\n            \"isBase64Encoded\": True,\n        }\n    except (OSError, http.client.HTTPException):\n        return {\n            \"statusCode\": 503,\n            \"headers\": {\"content-type\": \"application/json\", \"cache-control\": \"no-store\"},\n            \"body\": '{\"error\":{\"message\":\"The demo is starting. Please retry shortly.\"}}',\n        }\n    finally:\n        connection.close()\n"
+        }
+      },
+      "DependsOn": [
+        "AlbIngress"
+      ]
+    },
+    "Url": {
+      "Type": "AWS::Lambda::Url",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Public hackathon website with application-level sign-in",
+          "must": []
+        }
+      },
+      "Properties": {
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "Proxy",
+            "Arn"
+          ]
+        },
+        "AuthType": "NONE",
+        "InvokeMode": "BUFFERED"
+      }
+    },
+    "UrlPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Visitors can open the public demo website",
+          "must": []
+        }
+      },
+      "Properties": {
+        "FunctionName": {
+          "Ref": "Proxy"
+        },
+        "Action": "lambda:InvokeFunctionUrl",
+        "Principal": "*",
+        "FunctionUrlAuthType": "NONE"
+      }
+    },
+    "InvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Invocation permission is limited to HTTPS Function URL requests",
+          "must": []
+        }
+      },
+      "Properties": {
+        "FunctionName": {
+          "Ref": "Proxy"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "*",
+        "InvokedViaFunctionUrl": true
+      }
+    },
+    "Errors": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Metadata": {
+        "com.aws.cloudformation.Context": {
+          "why": "Monitor demo proxy failures",
+          "must": []
+        }
+      },
+      "Properties": {
+        "AlarmDescription": "TenderLens HTTPS proxy invocation errors",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "Proxy"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 5,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching"
+      }
+    }
+  },
+  "Outputs": {
+    "WebsiteUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Url",
+          "FunctionUrl"
+        ]
+      },
+      "Description": "Public HTTPS demo website"
+    }
+  }
+}

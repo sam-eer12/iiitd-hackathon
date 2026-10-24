@@ -1,4 +1,5 @@
 import "server-only";
+import { isWorkspaceOrigin } from "./request-origin";
 
 export const remoteWorkspace = () =>
   process.env.TENDERLENS_REMOTE_WORKSPACE === "true";
@@ -22,12 +23,7 @@ export async function proxyBackend(request: Request, path: string) {
       { error: { message: "Sign in to save your workspace." } },
       { status: 401, headers },
     );
-  const origin = request.headers.get("origin");
-  if (
-    request.method !== "GET" &&
-    origin &&
-    origin !== new URL(request.url).origin
-  )
+  if (request.method !== "GET" && !isWorkspaceOrigin(request))
     return Response.json(
       { error: { message: "Use this workspace to make changes." } },
       { status: 403, headers },

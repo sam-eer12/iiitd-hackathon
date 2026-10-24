@@ -1,0 +1,33 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Scoped image publishing for direct TenderLens demo builds when CodeBuild quota is zero",
+  "Resources": {
+    "Publisher": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "tenderlens-direct-demo-publish",
+        "Roles": [
+          "tenderlens-live-HostRole-DBMZHHsryeHK"
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload",
+                "ecr:PutImage"
+              ],
+              "Resource": [
+                "arn:aws:ecr:ap-south-1:749700168807:repository/tenderlens-data-backendrepository-zcwlntv5g6wy",
+                "arn:aws:ecr:ap-south-1:749700168807:repository/tenderlens-data-frontendrepository-xssym7ja9ipn"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

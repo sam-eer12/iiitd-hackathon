@@ -1,5 +1,37 @@
 # TenderLens on AWS
 
+## Current demo deployment (25 October 2026)
+
+Website: https://6g7ptgvw64vlq4eh45qazt5g7y0ukdov.lambda-url.ap-south-1.on.aws/
+
+The application stack is `tenderlens-live`. `tenderlens-https` supplies a public
+Lambda Function URL proxy to its private ALB while CloudFront account verification
+is pending. The proxy does not access the database or provider secrets. Browser
+mutations still require the existing Firebase identity, and the hostname is in
+Firebase's authorized domain list.
+
+The account currently has a CodeBuild queue quota of zero, so this release was
+built on the SSM-managed application host and published as immutable ECR images.
+The normal release scripts applied migrations, validated readiness and saved the
+healthy recovery bundle. `tenderlens-host-build` grants image-publishing access
+only to the two project repositories. CodePipeline source retrieval works, but
+automatic builds require a nonzero CodeBuild quota.
+
+The key policy now permits the existing Auto Scaling service-linked role to use
+the encrypted boot volume and create AWS-resource grants. This fixes the earlier
+`InvalidKMSKey.InvalidState` host launch failure without replacing the data key.
+
+Runtime configuration `/etc/tenderlens/runtime.json` includes `publicOrigin`.
+The release passes it as `TENDERLENS_PUBLIC_ORIGIN` to Next.js so HTTPS browser
+requests are checked against the public origin rather than the internal HTTP hop.
+Keep that value and Firebase's authorized hostname aligned when changing URLs.
+
+Optional proxy infrastructure is reproducible with `render_public_proxy.py`
+and `templates/public-proxy.json`. The direct-build publishing policy is recorded
+in `templates/host-build.json`.
+
+## Original deployment design
+
 The deployment uses the `tenderlens` AWS profile and `ap-south-1` region.
 
 The current Next.js 16 application runs in Docker on EC2 alongside FastAPI and

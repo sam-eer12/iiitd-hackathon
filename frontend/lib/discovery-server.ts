@@ -5,6 +5,7 @@ import { DISCOVERY_SCHEMA } from "./tinyfish-schema";
 import { validateDiscoveryResult } from "./discovery-validation";
 import type { DiscoveryJob } from "./types";
 import { INITIAL_TENDER_CATALOG } from "./tender-catalog";
+import { isWorkspaceOrigin } from "./request-origin";
 
 const API_BASE = "https://agent.tinyfish.ai";
 const DATA_DIRECTORY = path.join(process.cwd(), ".data", "discovery");
@@ -42,8 +43,7 @@ export function discoveryConfiguration(request: Request) {
 }
 
 export function authorizeDiscovery(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (!isWorkspaceOrigin(request))
     throw new DiscoveryError(
       "This discovery request must come from the TenderLens workspace.",
       403,

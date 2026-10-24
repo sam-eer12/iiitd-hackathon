@@ -39,6 +39,8 @@ allowed = {
     "ENTITYLOCKER_SIGNING_CERTIFICATE_PATH",
 }
 backend_env.update({key: str(value) for key, value in provider.items() if key in allowed and value})
+if config.get("publicOrigin") and not backend_env.get("SANDBOX_RETURN_URL"):
+    backend_env["SANDBOX_RETURN_URL"] = config["publicOrigin"] + "/dashboard/profile"
 os.environ.update(backend_env)
 os.environ["DATABASE_HOST"] = config["databaseHost"]
 docker_env = [part for key in backend_env for part in ["-e", key]]
@@ -139,6 +141,8 @@ run(
     "TENDERLENS_API_URL=http://api:8000",
     "-e",
     "TENDERLENS_REMOTE_WORKSPACE=true",
+    "-e",
+    "TENDERLENS_PUBLIC_ORIGIN=" + config.get("publicOrigin", ""),
     images["frontend"],
 )
 run(

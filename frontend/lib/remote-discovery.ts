@@ -1,4 +1,5 @@
 import "server-only";
+import { isWorkspaceOrigin } from "./request-origin";
 import { backendFetch, proxyBackend } from "./backend-proxy";
 import { INITIAL_TENDER_CATALOG } from "./tender-catalog";
 import { validateDiscoveryResult } from "./discovery-validation";
@@ -27,12 +28,7 @@ export async function remoteCatalog() {
 }
 
 export async function remoteDiscovery(request: Request, id?: string) {
-  const origin = request.headers.get("origin");
-  if (
-    request.method !== "GET" &&
-    origin &&
-    origin !== new URL(request.url).origin
-  )
+  if (request.method !== "GET" && !isWorkspaceOrigin(request))
     return Response.json(
       { error: "Use this workspace to start source collection." },
       { status: 403 },

@@ -1,4 +1,5 @@
 import "server-only";
+import { isWorkspaceOrigin } from "./request-origin";
 import { backendFetch, proxyBackend, remoteWorkspace } from "./backend-proxy";
 import { latestTenderCatalog } from "./discovery-server";
 import { remoteCatalog } from "./remote-discovery";
@@ -16,8 +17,7 @@ const errorResponse = (message: string, status: number) =>
 function validateRequest(request: Request) {
   if (!request.headers.get("authorization")?.startsWith("Bearer "))
     return errorResponse("Sign in with Google to continue to checkout.", 401);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
+  if (!isWorkspaceOrigin(request))
     return errorResponse("Use this workspace to complete checkout.", 403);
 }
 

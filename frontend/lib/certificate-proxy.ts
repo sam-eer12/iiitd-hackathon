@@ -1,4 +1,5 @@
 import "server-only";
+import { isWorkspaceOrigin } from "./request-origin";
 
 const headers = { "Cache-Control": "no-store" };
 const unavailable = () =>
@@ -20,8 +21,7 @@ export async function proxyCertificateRequest(request: Request, path = "") {
       { status: 401, headers },
     );
   if (request.method !== "GET") {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    if (!isWorkspaceOrigin(request))
       return Response.json(
         {
           error: {
