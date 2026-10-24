@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: tenderlens-db
+    environment:
+      POSTGRES_USER: tenderlens
+      POSTGRES_PASSWORD: tenderlens_dev
+      POSTGRES_DB: tenderlens
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tenderlens -d tenderlens"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: tenderlens-api
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build: .
+    container_name: tenderlens-worker
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    command: ["uv", "run", "python", "-m", "app.worker"]
+
+volumes:
+  pgdata:
