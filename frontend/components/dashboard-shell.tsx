@@ -14,6 +14,10 @@ const navigation: { href: string; label: string; icon: IconName }[] = [
   { href: "/dashboard/saved", label: "Saved tenders", icon: "bookmark" },
   { href: "/dashboard/amendments", label: "Amendments", icon: "history" },
 ];
+const otherPageNames: Record<string, string> = {
+  "/dashboard/settings": "Settings",
+  "/dashboard/help": "Help & getting started",
+};
 const workspaceNavigation: { href: string; label: string; icon: IconName }[] = [
   { href: "/dashboard/profile", label: "Supplier profile", icon: "building" },
   { href: "/dashboard/sources", label: "Connected sources", icon: "globe" },
@@ -31,10 +35,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     collectionMode,
   } = useWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const amendedCount = tenders.filter((tender) => tender.amended).length;
   const pageName =
     [...navigation, ...workspaceNavigation].find(
       (item) => item.href === pathname,
-    )?.label ?? "Workspace";
+    )?.label ??
+    otherPageNames[pathname] ??
+    "Workspace";
   const initials = profile.company
     .split(" ")
     .slice(0, 2)
@@ -60,8 +67,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </span>
         )}
         {item.label === "Amendments" && (
-          <span className="nav-count nav-count-green">
-            {tenders.filter((tender) => tender.amended).length}
+          <span
+            className={`nav-count ${amendedCount ? "nav-count-green" : ""}`}
+          >
+            {amendedCount}
           </span>
         )}
       </Link>
@@ -107,7 +116,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <strong>{profile.company}</strong>
             <small>Supplier workspace</small>
           </span>
-          <Icon name="chevronDown" size={15} />
+          <Icon name="chevron" size={15} />
         </Link>
         <div className="sidebar-group-label">WORKSPACE</div>
         <nav>{navigation.map(navItem)}</nav>
@@ -177,11 +186,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <strong>{pageName}</strong>
           </div>
           <div className="topbar-right">
-            <span className="workspace-mode">
+            <span
+              className={`workspace-mode workspace-mode-${collectionMode}`}
+              title={
+                collectionMode === "live"
+                  ? "Live discovery"
+                  : "Sample workspace"
+              }
+            >
               <span className="live-dot" />
-              {collectionMode === "live"
-                ? "Live discovery"
-                : "Sample workspace"}
+              <span className="workspace-mode-label">
+                {collectionMode === "live"
+                  ? "Live discovery"
+                  : "Sample workspace"}
+              </span>
             </span>
             <AuthProfile />
             <Link
@@ -190,7 +208,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               aria-label="View amendments"
             >
               <Icon name="bell" size={19} />
-              <i />
+              {amendedCount > 0 && <i />}
             </Link>
             <Link
               href="/dashboard/profile"
