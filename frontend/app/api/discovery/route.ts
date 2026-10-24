@@ -1,3 +1,5 @@
+import { remoteWorkspace } from "@/lib/backend-proxy";
+import { remoteDiscovery } from "@/lib/remote-discovery";
 import { NextRequest, NextResponse } from "next/server";
 import {
   authorizeDiscovery,
@@ -9,6 +11,7 @@ import {
 } from "@/lib/discovery-server";
 
 export async function GET(request: NextRequest) {
+  if (remoteWorkspace()) return remoteDiscovery(request);
   return NextResponse.json(discoveryConfiguration(request), {
     headers: { "Cache-Control": "no-store" },
   });
@@ -16,6 +19,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (remoteWorkspace()) return remoteDiscovery(request);
     authorizeDiscovery(request);
     const job = await startDiscovery();
     const response = NextResponse.json(

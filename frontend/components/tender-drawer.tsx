@@ -15,9 +15,20 @@ export function TenderDrawer({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const { profile, savedIds, toggleSaved, evaluationTime } = useWorkspace();
+  const {
+    profile,
+    savedIds,
+    toggleSaved,
+    evaluationTime,
+    verifiedCertificates,
+  } = useWorkspace();
   const [tab, setTab] = useState("readiness");
-  const evaluation = evaluateTender(tender, profile, new Date(evaluationTime));
+  const evaluation = evaluateTender(
+    tender,
+    profile,
+    new Date(evaluationTime),
+    verifiedCertificates,
+  );
   const deadline = tender.deadline ? new Date(tender.deadline) : null;
   const checkCounts = {
     meets: evaluation.findings.filter((finding) => finding.status === "meets")

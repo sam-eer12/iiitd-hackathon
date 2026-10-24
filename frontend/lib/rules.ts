@@ -23,6 +23,7 @@ export function evaluateCondition(
   condition: Condition,
   profile: SupplierProfile,
   now: Date,
+  verifiedCertificates: readonly (keyof SupplierProfile["certificates"])[] = [],
 ): Finding {
   if (
     !condition.quote ||
@@ -102,12 +103,20 @@ export function evaluateCondition(
         condition,
         "Confirm whether you have this certificate. Unknown does not count as a pass.",
       );
+    if (value && !verifiedCertificates.includes(condition.certificate))
+      return {
+        condition,
+        status: "review",
+        supplierValue: "Present · self-declared",
+        reason:
+          "The certificate is self-declared. An issuer verification is required before this check can pass.",
+      };
     return {
       condition,
       status: value ? "meets" : "blocked",
-      supplierValue: value ? "Present in profile" : "Confirmed absent",
+      supplierValue: value ? "Issuer verified" : "Confirmed absent",
       reason: value
-        ? "Your profile declares this certificate is present. Verify the supporting document before bidding."
+        ? "The certificate has a current issuer verification matching this supplier."
         : "Your profile confirms that the required certificate is absent.",
     };
   }
@@ -132,9 +141,10 @@ export function evaluateTender(
   tender: Tender,
   profile: SupplierProfile,
   now: Date,
+  verifiedCertificates: readonly (keyof SupplierProfile["certificates"])[] = [],
 ): Evaluation {
   const findings = tender.conditions.map((condition) =>
-    evaluateCondition(condition, profile, now),
+    evaluateCondition(condition, profile, now, verifiedCertificates),
   );
   const coverageComplete =
     new Set(tender.conditions.map((condition) => condition.type)).size === 5;

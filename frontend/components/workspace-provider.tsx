@@ -4,10 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useEffect,
   useState,
   useSyncExternalStore,
 } from "react";
+import { hasVerifiedDocument } from "@/lib/certificate-verification";
+import { useCertificateVerification } from "@/lib/use-certificate-verification";
+import { useAuth } from "@/lib/auth-context";
+import { auth } from "@/lib/firebase";
 import { DEFAULT_PROFILE } from "@/lib/demo-data";
 import { INITIAL_TENDER_CATALOG } from "@/lib/tender-catalog";
 import {
@@ -32,9 +37,9 @@ const initial: StoredWorkspace = {
 };
 const readySubscribe = () => () => {};
 
-function readStoredWorkspace(): StoredWorkspace {
+function readStoredWorkspace(key: string): StoredWorkspace {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? restoreWorkspace(JSON.parse(raw), initial) : initial;
   } catch {
     return initial;
@@ -42,6 +47,8 @@ function readStoredWorkspace(): StoredWorkspace {
 }
 
 interface WorkspaceContextValue extends StoredWorkspace {
+  certificateVerification: ReturnType<typeof useCertificateVerification>;
+  verifiedCertificates: readonly (keyof SupplierProfile["certificates"])[];
   ready: boolean;
   tenders: Tender[];
   toast: string;
@@ -57,6 +64,21 @@ interface WorkspaceContextValue extends StoredWorkspace {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  return (
+    <WorkspaceStateProvider
+      key={loading ? "loading" : (user?.uid ?? "anonymous")}
+    >
+      {children}
+    </WorkspaceStateProvider>
+  );
+}
+
+function WorkspaceStateProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const storageKey = user ? `${STORAGE_KEY}.${user.uid}` : STORAGE_KEY;
+  const [profileLoaded, setProfileLoaded] = useState(!user);
+  const certificateVerification = useCertificateVerification();
   const ready = useSyncExternalStore(
     readySubscribe,
     () => true,
@@ -71,13 +93,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    const workspace = readStoredWorkspace();
+    const workspace = readStoredWorkspace(storageKey);
     const timer = setTimeout(() => {
       setStored(workspace);
       setLoaded(true);
     }, 0);
     return () => clearTimeout(timer);
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -109,12 +131,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loaded) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        localStorage.setItem(storageKey, JSON.stringify(stored));
       } catch {
         /* Browser storage can be unavailable in private contexts. */
       }
     }
-  }, [stored, loaded]);
+  }, [stored, loaded, storageKey]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4000);
@@ -129,6 +151,41 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || !loaded) return;
+    const controller = new AbortController();
+    void user
+      .getIdToken()
+      .then(async (token) => {
+        const response = await fetch("/api/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const value = await response.json();
+          if (!controller.signal.aborted && auth.currentUser?.uid === user.uid)
+            setStored((previous) => ({
+              ...previous,
+              profile: {
+                ...value.facts,
+                turnover: value.facts.turnover.length
+                  ? value.facts.turnover
+                  : DEFAULT_PROFILE.turnover.map(({ year }) => ({
+                      year,
+                      amount: null,
+                    })),
+              },
+            }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setProfileLoaded(true);
+      });
+    return () => controller.abort();
+  }, [user, loaded]);
 
   const applyJob = useCallback((job: DiscoveryJob) => {
     setStored((previous) => {
@@ -160,8 +217,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     const controller = new AbortController();
     const poll = async () => {
       try {
+        const token = await auth.currentUser?.getIdToken();
         const response = await fetch(`/api/discovery/${jobId}`, {
           signal: controller.signal,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const payload = await response.json();
         if (response.ok) applyJob(payload.job);
@@ -187,10 +246,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   async function refresh(accessToken?: string) {
     setDiscoveryError("");
     try {
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch("/api/discovery", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(accessToken ? { "x-discovery-token": accessToken } : {}),
         },
         body: "{}",
@@ -212,16 +273,61 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const verifiedCertificates = useMemo(
+    () =>
+      certificateVerification.records
+        .filter(
+          (record) =>
+            record.kind === "gst" &&
+            hasVerifiedDocument(
+              record,
+              stored.profile,
+              new Date(evaluationTime),
+            ),
+        )
+        .map(() => "gst" as const),
+    [certificateVerification.records, stored.profile, evaluationTime],
+  );
+
   const value: WorkspaceContextValue = {
     ...stored,
-    ready: ready && loaded,
+    certificateVerification,
+    verifiedCertificates,
+    ready: ready && loaded && profileLoaded,
     tenders: stored.liveTenders,
     toast,
     discoveryError,
     evaluationTime,
-    saveProfile: (profile) => {
+    saveProfile: async (profile) => {
       setStored((previous) => ({ ...previous, profile }));
-      setToast("Supplier profile saved. Readiness checks have been updated.");
+      const account = auth.currentUser;
+      if (account) {
+        try {
+          const token = await account.getIdToken();
+          const response = await fetch("/api/profile", {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              facts: profile,
+              provenance: "self-reported",
+            }),
+          });
+          if (!response.ok) throw new Error("Save failed");
+          setToast(
+            "Supplier profile saved. Readiness checks have been updated.",
+          );
+        } catch {
+          setToast(
+            "Saved in this browser. Account storage is unavailable; please save again when connected.",
+          );
+        }
+      } else
+        setToast(
+          "Supplier profile saved in this browser. Sign in to save it to your account.",
+        );
     },
     toggleSaved: (id) =>
       setStored((previous) => ({

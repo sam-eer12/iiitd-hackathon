@@ -7,7 +7,6 @@ import {
   signInWithGoogle as fbSignIn,
   logOut as fbSignOut,
 } from "@/lib/firebase";
-import { upsertUser } from "@/lib/dataconnect";
 
 interface AuthContextType {
   user: User | null;
@@ -36,11 +35,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentUser && currentUser.email) {
         try {
-          // Sync authenticated user to PostgreSQL via Firebase Data Connect
-          await upsertUser({
-            email: currentUser.email,
-            displayName: currentUser.displayName || null,
-            photoUrl: currentUser.photoURL || null,
+          // Firebase authenticates; FastAPI persists users and workspaces in RDS.
+          const token = await currentUser.getIdToken();
+          await fetch("/api/account", {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}` },
           });
         } catch {
           // If offline/emulator not connected, don't block user session

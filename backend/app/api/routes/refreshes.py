@@ -2,11 +2,12 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_authenticated_context
 from app.core.authorization import AuthenticatedContext
+from app.core.config import get_settings
 from app.core.errors import NotFoundError
 from app.database import get_db
 from app.repositories.refreshes import (
@@ -30,6 +31,9 @@ async def create_refresh(
     ctx: AuthenticatedContext = Depends(get_authenticated_context),
     db: AsyncSession = Depends(get_db),
 ) -> RefreshJobResponse:
+    settings = get_settings()
+    if settings.APP_ENV == "production" and not settings.TINYFISH_API_KEY:
+        raise HTTPException(status_code=503, detail="Live collection is not configured.")
     job = await create_refresh_job(
         db,
         workspace_id=ctx.workspace_id,

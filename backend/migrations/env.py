@@ -9,6 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
+from app.core.database import configure_iam_auth, connection_options
 from app.models.base import Base
 
 config = context.config
@@ -72,7 +73,9 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connection_options(settings),
     )
+    configure_iam_auth(connectable, settings)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

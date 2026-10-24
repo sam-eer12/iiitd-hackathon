@@ -1,6 +1,7 @@
 """Storage adapter supporting local filesystem and S3."""
 
-from pathlib import Path
+import asyncio
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from app.core.config import get_settings
@@ -44,6 +45,53 @@ class FilesystemStorageBackend:
         return path.exists()
 
 
+class S3StorageBackend:
+    """Private evidence objects using the EC2 role, never static AWS credentials."""
+
+    def __init__(self, bucket: str, region: str | None = None):
+        import boto3
+
+        self.bucket = bucket
+        self.client = boto3.client("s3", region_name=region)
+
+    @staticmethod
+    def _key(key: str) -> str:
+        if not key or key.startswith("/") or "\\" in key or ".." in PurePosixPath(key).parts:
+            raise ValueError("Invalid evidence object key.")
+        return key
+
+    async def save_file(self, key: str, data: bytes) -> str:
+        key = self._key(key)
+        await asyncio.to_thread(self.client.put_object, Bucket=self.bucket, Key=key, Body=data)
+        return f"s3://{self.bucket}/{key}"
+
+    async def get_file(self, key: str) -> bytes:
+        from botocore.exceptions import ClientError
+
+        def read() -> bytes:
+            try:
+                response = self.client.get_object(Bucket=self.bucket, Key=self._key(key))
+            except ClientError as exc:
+                if exc.response["Error"]["Code"] in {"NoSuchKey", "404"}:
+                    raise FileNotFoundError("Evidence object not found.") from exc
+                raise
+            with response["Body"] as body:
+                return body.read()
+
+        return await asyncio.to_thread(read)
+
+    async def exists(self, key: str) -> bool:
+        from botocore.exceptions import ClientError
+
+        try:
+            await asyncio.to_thread(self.client.head_object, Bucket=self.bucket, Key=self._key(key))
+            return True
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] in {"NoSuchKey", "404"}:
+                return False
+            raise
+
+
 _storage_instance: StorageBackend | None = None
 
 
@@ -51,5 +99,12 @@ def get_storage() -> StorageBackend:
     global _storage_instance
     if _storage_instance is None:
         settings = get_settings()
-        _storage_instance = FilesystemStorageBackend(settings.LOCAL_STORAGE_PATH)
+        if settings.STORAGE_BACKEND == "s3":
+            if not settings.S3_BUCKET:
+                raise ValueError("S3_BUCKET is required when STORAGE_BACKEND=s3.")
+            _storage_instance = S3StorageBackend(settings.S3_BUCKET, settings.AWS_REGION)
+        else:
+            if settings.APP_ENV == "production":
+                raise ValueError("Production evidence storage must use S3.")
+            _storage_instance = FilesystemStorageBackend(settings.LOCAL_STORAGE_PATH)
     return _storage_instance

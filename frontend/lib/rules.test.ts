@@ -194,7 +194,22 @@ test("all five supported, evidenced checks must pass for aggregate Meets", () =>
     },
   ];
   assert.equal(
-    evaluateTender({ ...tender, conditions }, profile, now).status,
+    evaluateTender({ ...tender, conditions }, profile, now, ["gst"]).status,
     "meets",
   );
+});
+
+test("self-declared present certificates remain unresolved without an issuer receipt", () => {
+  const result = evaluateCondition(
+    {
+      ...evidence,
+      type: "certificate",
+      label: "GST",
+      requirement: "GST",
+      certificate: "gst",
+    },
+    profile,
+    now,
+  );
+  assert.equal(result.status, "review");
 });
