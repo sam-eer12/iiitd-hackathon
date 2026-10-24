@@ -1,29 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { evaluateTender } from "@/lib/rules";
-import type { DiscoveryJob, Readiness, Tender } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import { sourceReviewVersion, tenderAvailability } from "@/lib/purchases";
 import { Icon, type IconName } from "./icon";
-import { StatusBadge } from "./status-badge";
-import { TenderDrawer } from "./tender-drawer";
+import { AvailabilityBadge, TenderDrawer } from "./tender-drawer";
 import { useWorkspace } from "./workspace-provider";
 
 function StatCard({
   label,
   value,
   icon,
-  tone,
   detail,
 }: {
   label: string;
   value: number | null;
   icon: IconName;
-  tone: string;
   detail: string;
 }) {
   return (
-    <div className={`stat-card stat-${tone}`}>
+    <div className="stat-card stat-neutral">
       <div>
         <span>{label}</span>
         <span className="stat-icon">
@@ -41,160 +37,6 @@ function StatCard({
   );
 }
 
-function DeadlineCell({
-  tender,
-  evaluationTime,
-}: {
-  tender: Tender;
-  evaluationTime: string;
-}) {
-  if (tender.deadline) {
-    const deadline = new Date(tender.deadline);
-    return (
-      <>
-        <span className="deadline-date">
-          {deadline.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            timeZone: "Asia/Kolkata",
-          })}
-        </span>
-        <span className="deadline-time">
-          {deadline < new Date(evaluationTime)
-            ? "Deadline passed"
-            : `${deadline.toLocaleTimeString("en-US", {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-                timeZone: "Asia/Kolkata",
-              })} IST`}
-        </span>
-      </>
-    );
-  }
-  if (tender.deadlineText)
-    return (
-      <>
-        <span className="deadline-text" title={tender.deadlineText}>
-          {tender.deadlineText}
-        </span>
-        <span className="deadline-time">As listed · verify source</span>
-      </>
-    );
-  return (
-    <>
-      <span className="deadline-date">Unconfirmed</span>
-      <span className="deadline-time">Verify source</span>
-    </>
-  );
-}
-
-const timeFormat: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "Asia/Kolkata",
-};
-
-/* Recent workspace events from the latest source run and amendment links. */
-function RecentActivity({
-  job,
-  tenders,
-}: {
-  job: DiscoveryJob | null;
-  tenders: Tender[];
-}) {
-  const items: {
-    id: string;
-    href: string;
-    tone: "meets" | "review" | "blocked" | "info";
-    title: string;
-    detail: string;
-  }[] = [];
-  if (job) {
-    const when = new Date(job.finishedAt ?? job.createdAt).toLocaleString(
-      "en-GB",
-      timeFormat,
-    );
-    const run = {
-      completed: {
-        tone: "meets",
-        title: "Source run completed",
-        detail: `${job.tenders?.length ?? 0} notices · ${when} IST`,
-      },
-      running: {
-        tone: "info",
-        title: "Source run in progress",
-        detail: `Started ${when} IST`,
-      },
-      submitting: {
-        tone: "info",
-        title: "Source run starting",
-        detail: `Started ${when} IST`,
-      },
-      failed: {
-        tone: "blocked",
-        title: "Source run failed",
-        detail: `${when} IST`,
-      },
-      cancelled: {
-        tone: "review",
-        title: "Source run cancelled",
-        detail: `${when} IST`,
-      },
-      submission_unknown: {
-        tone: "review",
-        title: "Source run needs reconciliation",
-        detail: `${when} IST`,
-      },
-    }[job.status] as {
-      tone: "meets" | "review" | "blocked" | "info";
-      title: string;
-      detail: string;
-    };
-    items.push({ id: job.id, href: "/dashboard/sources", ...run });
-  }
-  for (const tender of tenders.filter((item) => item.amendmentUrls.length))
-    items.push({
-      id: `amendments-${tender.id}`,
-      href: "/dashboard/amendments",
-      tone: "review",
-      title: "Amendment links found",
-      detail: `${tender.title} · not yet compared`,
-    });
-  return (
-    <section className="activity-card" aria-labelledby="activity-heading">
-      <div className="aside-card-heading">
-        <span className="eyebrow" id="activity-heading">
-          RECENT ACTIVITY
-        </span>
-        <Icon name="activity" size={16} />
-      </div>
-      {items.length ? (
-        <ol className="activity-list">
-          {items.slice(0, 4).map((item) => (
-            <li key={item.id}>
-              <Link href={item.href}>
-                <span className={`activity-dot activity-${item.tone}`} />
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>{item.detail}</small>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="activity-empty">
-          No source runs or amendments yet. Run live discovery from Connected
-          sources.
-        </p>
-      )}
-    </section>
-  );
-}
-
 export function TenderExplorer({
   mode = "overview",
 }: {
@@ -208,18 +50,17 @@ export function TenderExplorer({
     refresh,
     job,
     discoveryError,
-    notify,
     evaluationTime,
     catalogRetrievedAt,
-    verifiedCertificates,
+    purchaseFlow,
     ready,
   } = useWorkspace();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | Readiness>("all");
-  const [category, setCategory] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sort, setSort] = useState("relevance");
-  const [selected, setSelected] = useState<Tender | null>(null);
+  const [filter, setFilter] = useState<"all" | "open" | "closed" | "unknown">(
+    "all",
+  );
+  const [sort, setSort] = useState("deadline");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -239,96 +80,48 @@ export function TenderExplorer({
     return () => document.removeEventListener("keydown", shortcut);
   }, []);
   const isRunning = !!job && ["submitting", "running"].includes(job.status);
-  const evaluated = useMemo(
-    () =>
-      tenders.map((tender) => ({
-        tender,
-        evaluation: evaluateTender(
-          tender,
-          profile,
-          new Date(evaluationTime),
-          verifiedCertificates,
-        ),
-      })),
-    [tenders, profile, evaluationTime, verifiedCertificates],
-  );
-  const counts = {
-    meets: evaluated.filter((entry) => entry.evaluation.status === "meets")
-      .length,
-    review: evaluated.filter((entry) => entry.evaluation.status === "review")
-      .length,
-    blocked: evaluated.filter((entry) => entry.evaluation.status === "blocked")
-      .length,
-  };
+  const now = new Date(evaluationTime);
   const base =
     mode === "saved"
-      ? evaluated.filter(({ tender }) => savedIds.includes(tender.id))
-      : evaluated;
+      ? tenders.filter((tender) => savedIds.includes(tender.id))
+      : tenders;
   const visible = base
     .filter(
-      ({ tender, evaluation }) =>
-        (filter === "all" || evaluation.status === filter) &&
-        (category === "all" || tender.category === category) &&
+      (tender) =>
+        (filter === "all" || tenderAvailability(tender, now) === filter) &&
         `${tender.title} ${tender.reference} ${tender.category}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     )
-    .sort((a, b) =>
-      sort === "deadline"
-        ? (a.tender.deadline ?? "9999").localeCompare(
-            b.tender.deadline ?? "9999",
-          )
-        : (b.tender.relevance ?? 0) - (a.tender.relevance ?? 0),
-    );
-  const amendments = tenders.filter((tender) => tender.amended).length;
-  const completenessValues = [
-    profile.company,
-    profile.turnover.every((year) => year.amount !== null),
-    profile.completedOrders !== null,
-    profile.depositCapacity !== null,
-    ...Object.values(profile.certificates).map((value) => value !== null),
-  ];
-  const completeness = Math.round(
-    (completenessValues.filter(Boolean).length / completenessValues.length) *
-      100,
+    .sort((a, b) => {
+      if (sort === "title") return a.title.localeCompare(b.title);
+      const rank = { open: 0, unknown: 1, closed: 2 };
+      return (
+        rank[tenderAvailability(a, now)] - rank[tenderAvailability(b, now)] ||
+        (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999")
+      );
+    });
+  const selected = tenders.find((tender) => tender.id === selectedId);
+  const purchased = purchaseFlow.orders.filter(
+    (order) => order.status === "purchased",
   );
-
-  function exportShortlist() {
-    const data = visible.map(({ tender, evaluation }) => ({
-      reference: tender.reference,
-      title: tender.title,
-      readiness: evaluation.status,
-      provenance: tender.provenance,
-      deadline: tender.deadlineText,
-      source: tender.sourceUrl,
-    }));
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "tenderlens-shortlist.json";
-    anchor.click();
-    URL.revokeObjectURL(url);
-    notify(`Exported ${data.length} tenders with their provenance labels.`);
-  }
 
   return (
     <>
       <div className="workspace-heading">
         <div>
-          <div className="eyebrow">YOUR OPPORTUNITY, IN FOCUS</div>
+          <div className="eyebrow">FIND → REVIEW → BUY</div>
           <h1>
             {mode === "saved"
-              ? "Good opportunities. Kept close."
+              ? "Your saved tenders."
               : mode === "discover"
-                ? "Find your next good fit."
-                : "A clearer view of what’s next."}
+                ? "Find your next tender."
+                : "Your next tender, one step at a time."}
           </h1>
           <p>
             {mode === "saved"
-              ? "Your saved notices, their readiness, and everything worth another look."
-              : "Discover relevant tenders. Understand your readiness. Make your next move."}
+              ? "Come back to a notice, review its documents and continue to demo checkout."
+              : "Find official notices with TinyFish, review the documents and try a demo purchase."}
           </p>
         </div>
         <button
@@ -338,7 +131,7 @@ export function TenderExplorer({
           aria-busy={isRunning}
         >
           <Icon name="refresh" size={16} className={isRunning ? "spin" : ""} />
-          {isRunning ? "Checking source…" : "Refresh tenders"}
+          {isRunning ? "Fetching tenders…" : "Fetch tenders"}
         </button>
       </div>
       {discoveryError && (
@@ -352,53 +145,75 @@ export function TenderExplorer({
       )}
       {mode === "overview" && (
         <>
+          <nav className="supplier-steps" aria-label="Supplier workflow">
+            {[
+              {
+                href: "/dashboard/profile",
+                title: "Create your profile",
+                detail: "Sign in with Google and save your business details.",
+              },
+              {
+                href: "/dashboard/profile#document-verification",
+                title: "Verify with DigiLocker",
+                detail: "Connect your identity. Optional for demo checkout.",
+              },
+              {
+                href: "/dashboard/tenders",
+                title: "Find & review",
+                detail: "Read the notice, deadline and official documents.",
+              },
+              {
+                href: "/dashboard/purchases",
+                title: "Buy in the demo",
+                detail: "Simulate payment and keep your receipt in My tenders.",
+              },
+            ].map((step, index) => (
+              <Link key={step.title} href={step.href}>
+                <b>{index + 1}</b>
+                <span>
+                  <strong>{step.title}</strong>
+                  <small>{step.detail}</small>
+                </span>
+              </Link>
+            ))}
+          </nav>
           <div className="stats-grid">
             <StatCard
-              label="Discovered tenders"
+              label="Fetched tenders"
               value={ready ? tenders.length : null}
               icon="document"
-              tone="neutral"
-              detail="From the official IIIT-Delhi source"
+              detail="Official IIIT-Delhi notices"
             />
             <StatCard
-              label="Meets checked conditions"
-              value={ready ? counts.meets : null}
-              icon="checkCircle"
-              tone="green"
-              detail="A promising place to start"
-            />
-            <StatCard
-              label="Review needed"
-              value={ready ? counts.review : null}
+              label="Open for review"
+              value={
+                ready
+                  ? tenders.filter(
+                      (tender) => tenderAvailability(tender, now) === "open",
+                    ).length
+                  : null
+              }
               icon="clock"
-              tone="amber"
-              detail="A few details to look into"
+              detail="Submission deadline has not passed"
             />
             <StatCard
-              label="Blocked"
-              value={ready ? counts.blocked : null}
-              icon="shield"
-              tone="red"
-              detail="Know your blockers early"
+              label="Saved for later"
+              value={
+                ready
+                  ? tenders.filter((tender) => savedIds.includes(tender.id))
+                      .length
+                  : null
+              }
+              icon="bookmark"
+              detail="Your personal shortlist"
+            />
+            <StatCard
+              label="Demo purchased"
+              value={ready && !purchaseFlow.loading ? purchased.length : null}
+              icon="checkCircle"
+              detail="Simulated purchases · no real charge"
             />
           </div>
-          {amendments > 0 && (
-            <Link href="/dashboard/amendments" className="amendment-banner">
-              <span className="amendment-banner-icon">
-                <Icon name="history" size={21} />
-              </span>
-              <span>
-                <strong>A few things have changed.</strong>
-                <small>
-                  {amendments} tenders have visible amendments worth a closer
-                  look.
-                </small>
-              </span>
-              <b>
-                Review changes <Icon name="arrowRight" size={16} />
-              </b>
-            </Link>
-          )}
         </>
       )}
       <div
@@ -413,15 +228,8 @@ export function TenderExplorer({
                   : "Your tender shortlist"}
                 <span>{base.length}</span>
               </h2>
-              <p>Relevance brings it here. Evidence helps you decide.</p>
+              <p>Open a tender to review the documents and buy in the demo.</p>
             </div>
-            <button
-              className="icon-button"
-              onClick={exportShortlist}
-              aria-label="Export shortlist"
-            >
-              <Icon name="download" size={18} />
-            </button>
           </div>
           <div className="list-toolbar">
             <label className="search-field">
@@ -431,68 +239,35 @@ export function TenderExplorer({
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tenders, categories, references…"
+                placeholder="Search tenders or references…"
                 aria-label="Search tenders"
               />
               <kbd>/</kbd>
             </label>
-            <button
-              className={`button button-secondary button-small ${showFilters ? "button-selected" : ""}`}
-              aria-expanded={showFilters}
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Icon name="filter" size={15} />
-              Filters{category !== "all" && <span className="filter-dot" />}
-            </button>
           </div>
-          {showFilters && (
-            <div className="advanced-filters">
-              <label>
-                Category
-                <select
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                >
-                  <option value="all">All categories</option>
-                  {[...new Set(tenders.map((tender) => tender.category))].map(
-                    (value) => (
-                      <option key={value}>{value}</option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <button
-                className="text-link"
-                onClick={() => {
-                  setCategory("all");
-                  setFilter("all");
-                  setQuery("");
-                }}
-              >
-                Reset filters
-              </button>
-            </div>
-          )}
           <div className="list-tabs-row">
-            <div className="list-tabs" aria-label="Filter by readiness">
-              {[
-                { id: "all", label: "All tenders" },
-                { id: "meets", label: "Meets checks" },
-                { id: "review", label: "Review needed" },
-                { id: "blocked", label: "Blocked" },
-              ].map((tab) => (
+            <div className="list-tabs" aria-label="Filter by closing status">
+              {(
+                [
+                  { id: "all", label: "All tenders" },
+                  { id: "open", label: "Open" },
+                  { id: "closed", label: "Closed" },
+                  { id: "unknown", label: "Date unconfirmed" },
+                ] as const
+              ).map((tab) => (
                 <button
                   key={tab.id}
                   className={filter === tab.id ? "selected" : ""}
                   aria-pressed={filter === tab.id}
-                  onClick={() => setFilter(tab.id as typeof filter)}
+                  onClick={() => setFilter(tab.id)}
                 >
                   {tab.label}
                   <span>
                     {tab.id === "all"
                       ? base.length
                       : base.filter(
-                          ({ evaluation }) => evaluation.status === tab.id,
+                          (tender) =>
+                            tenderAvailability(tender, now) === tab.id,
                         ).length}
                   </span>
                 </button>
@@ -505,27 +280,27 @@ export function TenderExplorer({
                 onChange={(event) => setSort(event.target.value)}
                 aria-label="Sort tenders"
               >
-                <option value="relevance">Relevance</option>
                 <option value="deadline">Closing soon</option>
+                <option value="title">Title</option>
               </select>
             </label>
           </div>
           <div className="table-scroll">
-            <table className="tender-table" role="table">
-              <thead role="rowgroup">
-                <tr role="row">
-                  <th role="columnheader">Tender / opportunity</th>
-                  <th role="columnheader">Readiness</th>
-                  <th role="columnheader">Closing date</th>
-                  <th role="columnheader">
+            <table className="tender-table">
+              <thead>
+                <tr>
+                  <th>Tender / opportunity</th>
+                  <th>Status</th>
+                  <th>Closing date</th>
+                  <th>
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
-              <tbody role="rowgroup" aria-busy={!ready}>
+              <tbody aria-busy={!ready}>
                 {!ready &&
                   [0, 1, 2].map((row) => (
-                    <tr key={`loading-${row}`} className="skeleton-row">
+                    <tr key={row} className="skeleton-row">
                       <td className="cell-title">
                         <span className="skeleton skeleton-title" />
                         <span className="skeleton skeleton-meta" />
@@ -540,55 +315,67 @@ export function TenderExplorer({
                     </tr>
                   ))}
                 {ready &&
-                  visible.map(({ tender, evaluation }) => (
-                    <tr key={tender.id} role="row">
-                      <td className="cell-title" role="cell">
+                  visible.map((tender) => (
+                    <tr key={tender.id}>
+                      <td className="cell-title">
                         <div className="tender-title-cell">
-                          <span
-                            className={`tender-category-icon category-${tender.category === "Electronics" ? "electronics" : tender.category === "IT equipment" ? "it" : "lab"}`}
-                          >
-                            <Icon
-                              name={
-                                tender.category === "IT equipment"
-                                  ? "grid"
-                                  : tender.category === "Electronics"
-                                    ? "activity"
-                                    : "document"
-                              }
-                              size={19}
-                            />
+                          <span className="tender-category-icon category-it">
+                            <Icon name="document" size={19} />
                           </span>
                           <div>
                             <button
                               className="tender-title"
-                              onClick={() => setSelected(tender)}
+                              onClick={() => setSelectedId(tender.id)}
                             >
                               {tender.title}
                             </button>
                             <div className="tender-meta">
-                              <span>{tender.category}</span>
+                              <span>{tender.issuer}</span>
                               <i />
                               {tender.reference}
-                              {tender.amended && (
+                              {tender.amendmentUrls.length > 0 && (
                                 <span className="amended-label">
                                   <Icon name="history" size={11} />
-                                  Amended
+                                  Amendments
                                 </span>
                               )}
                             </div>
+                            {purchased.some(
+                              (order) => order.tender.id === tender.id,
+                            ) && (
+                              <span className="tender-purchase-label">
+                                Demo purchased · receipt saved
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
-                      <td className="cell-status" role="cell">
-                        <StatusBadge status={evaluation.status} short />
-                      </td>
-                      <td className="cell-deadline" role="cell">
-                        <DeadlineCell
-                          tender={tender}
-                          evaluationTime={evaluationTime}
+                      <td className="cell-status">
+                        <AvailabilityBadge
+                          status={tenderAvailability(tender, now)}
                         />
                       </td>
-                      <td className="cell-actions" role="cell">
+                      <td className="cell-deadline">
+                        <span className="deadline-date">
+                          {tender.deadline
+                            ? new Date(tender.deadline).toLocaleDateString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  timeZone: "Asia/Kolkata",
+                                },
+                              )
+                            : (tender.deadlineText ?? "Unconfirmed")}
+                        </span>
+                        <span className="deadline-time">
+                          {tender.deadline
+                            ? `${new Date(tender.deadline).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST`
+                            : "Check source"}
+                        </span>
+                      </td>
+                      <td className="cell-actions">
                         <div className="row-actions">
                           <button
                             className={`icon-button save-button ${savedIds.includes(tender.id) ? "is-saved" : ""}`}
@@ -599,11 +386,11 @@ export function TenderExplorer({
                             <Icon name="bookmark" size={17} />
                           </button>
                           <button
-                            className="icon-button"
-                            onClick={() => setSelected(tender)}
+                            className="button button-secondary button-small"
+                            onClick={() => setSelectedId(tender.id)}
                             aria-label={`Review ${tender.title}`}
                           >
-                            <Icon name="chevron" size={17} />
+                            Review
                           </button>
                         </div>
                       </td>
@@ -617,24 +404,32 @@ export function TenderExplorer({
               <Icon name={mode === "saved" ? "bookmark" : "search"} size={32} />
               <h3>
                 {mode === "saved" && !base.length
-                  ? "A good fit is worth keeping."
+                  ? "No saved tenders yet."
                   : "No tenders match these filters."}
               </h3>
               <p>
                 {mode === "saved" && !base.length
-                  ? "Save a notice from your shortlist to find it here."
+                  ? "Save a notice from Discover tenders to find it here."
                   : "Try another search or reset your filters."}
               </p>
-              <button
-                className="button button-secondary button-small"
-                onClick={() => {
-                  setQuery("");
-                  setCategory("all");
-                  setFilter("all");
-                }}
-              >
-                Reset filters
-              </button>
+              {mode === "saved" && !base.length ? (
+                <Link
+                  className="button button-secondary button-small"
+                  href="/dashboard/tenders"
+                >
+                  Discover tenders
+                </Link>
+              ) : (
+                <button
+                  className="button button-secondary button-small"
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("all");
+                  }}
+                >
+                  Reset filters
+                </button>
+              )}
             </div>
           )}
           <div className="table-footer">
@@ -657,78 +452,59 @@ export function TenderExplorer({
             <section className="supplier-card">
               <div className="aside-card-heading">
                 <span className="eyebrow">YOUR BUSINESS</span>
-                <Link
-                  href="/dashboard/profile"
-                  aria-label="Edit supplier profile"
-                >
-                  <Icon name="arrow" size={16} />
-                </Link>
+                <Icon name="building" size={18} />
               </div>
-              <span className="supplier-card-avatar">
-                <Icon name="building" size={23} />
-              </span>
-              <h3>{profile.company}</h3>
-              <p>Independent supplier · India</p>
-              <div className="profile-progress-label">
-                <span>Profile completeness</span>
-                <strong>{completeness}%</strong>
-              </div>
-              <div className="progress-track">
-                <span style={{ width: `${completeness}%` }} />
-              </div>
+              <h3>{profile.company || "Set up your supplier profile"}</h3>
+              <p>{profile.contact || "Add a contact person"}</p>
               <div className="supplier-categories">
-                {profile.categories.map((value) => (
-                  <span key={value}>{value}</span>
+                {profile.categories.map((category) => (
+                  <span key={category}>{category}</span>
                 ))}
-              </div>
-              <div className="profile-tip">
-                <Icon name="spark" size={15} />
-                <span>
-                  {completeness < 100
-                    ? "A certificate detail could make your next review clearer."
-                    : "Your profile is ready for a more informed review."}
-                </span>
               </div>
               <Link
                 href="/dashboard/profile"
                 className="button button-secondary button-small"
               >
-                Review profile <Icon name="arrowRight" size={15} />
+                Profile & DigiLocker <Icon name="arrowRight" size={15} />
               </Link>
             </section>
             <section className="source-mini-card">
               <div className="aside-card-heading">
-                <span className="eyebrow">YOUR DISCOVERY SOURCE</span>
-                <Icon name="globe" size={16} />
+                <span className="eyebrow">MY TENDERS</span>
+                <Icon name="checkCircle" size={18} />
+              </div>
+              <p>
+                Your demo purchases and receipts stay together in your account.
+              </p>
+              <Link className="text-link" href="/dashboard/purchases">
+                View My tenders <Icon name="arrowRight" size={14} />
+              </Link>
+            </section>
+            <section className="source-mini-card">
+              <div className="aside-card-heading">
+                <span className="eyebrow">DISCOVERY SOURCE</span>
+                <Icon name="globe" size={18} />
               </div>
               <div className="source-mini-heading">
                 <span className="source-avatar">II</span>
                 <div>
                   <strong>IIIT-Delhi</strong>
-                  <small>Public tender portal</small>
+                  <small>Public tender portal · TinyFish</small>
                 </div>
               </div>
-              <p>
-                <span className="live-dot" />
-                Official source snapshot available
-              </p>
               <Link className="text-link" href="/dashboard/sources">
                 Manage source <Icon name="arrowRight" size={14} />
               </Link>
             </section>
-            <RecentActivity job={job} tenders={tenders} />
-            <div className="workspace-footnote">
-              <Icon name="shield" size={18} />
-              <p>
-                Your final bid decision stays with you. TenderLens makes the
-                evidence easier to see.
-              </p>
-            </div>
           </aside>
         )}
       </div>
       {selected && (
-        <TenderDrawer tender={selected} onClose={() => setSelected(null)} />
+        <TenderDrawer
+          key={sourceReviewVersion(selected)}
+          tender={selected}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </>
   );

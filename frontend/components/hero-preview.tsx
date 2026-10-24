@@ -270,7 +270,7 @@ export function HeroPreview() {
       </span>
       <div>
         <strong>Ready for your review.</strong>
-        <small>PDF clause verification pending</small>
+        <small>Review documents → try demo checkout</small>
       </div>
     </div>
   );
@@ -337,8 +337,8 @@ export function HeroPreview() {
           </div>
           <div className="preview-facts">
             <div>
-              <small>Estimated value</small>
-              <strong>{tender.value}</strong>
+              <small>Issuer</small>
+              <strong>{tender.issuer}</strong>
             </div>
             <div>
               <small>Closing date</small>
@@ -347,18 +347,18 @@ export function HeroPreview() {
           </div>
           <div className="preview-condition">
             <Icon name="clock" size={16} />
-            <span>Turnover requirement</span>
-            <b>Review</b>
+            <span>Find the official notice</span>
+            <b>TinyFish</b>
           </div>
           <div className="preview-condition">
             <Icon name="clock" size={16} />
-            <span>Past experience</span>
-            <b>Review</b>
+            <span>Review tender documents</span>
+            <b>PDF</b>
           </div>
           <div className="preview-condition">
             <Icon name="clock" size={16} />
-            <span>Required certificates</span>
-            <b>Review</b>
+            <span>Complete demo checkout</span>
+            <b>No charge</b>
           </div>
           <div className="preview-source">
             <Icon name="link" size={13} /> Official tender PDF linked.

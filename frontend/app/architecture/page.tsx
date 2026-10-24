@@ -14,16 +14,14 @@ export default function ArchitecturePage() {
           <h1 className="reveal reveal-1">
             From opportunity
             <br />
-            to evidence. <span className="serif-accent">Connected.</span>
+            to demo purchase. <span className="serif-accent">Connected.</span>
           </h1>
           <p className="reveal reveal-2">
-            The complete TenderLens target architecture, generated with Mermaid
-            Charts. The current build includes the landing page, interactive
-            dashboard with real TinyFish tender snapshots, browser-persisted
-            profiles and bookmarks, and a server-side discovery adapter. The
-            separate FastAPI backend provides persistence and worker modules;
-            connecting the dashboard to those endpoints and deploying to AWS
-            remain pending.
+            The simplified supplier journey: Google sign-in, a saved business
+            profile, DigiLocker, TinyFish discovery, official document review
+            and demo checkout. FastAPI saves account-owned demo orders and
+            receipts in PostgreSQL. The existing identity and discovery
+            integrations stay connected.
           </p>
         </div>
         <div className="architecture-summary reveal reveal-3">
@@ -31,7 +29,7 @@ export default function ArchitecturePage() {
             {
               number: "01 / EXPERIENCE",
               title: "A focused workspace",
-              text: "Landing page → dashboard → supplier profile, tenders, evidence, and changes.",
+              text: "Google sign-in → supplier profile → DigiLocker → discover and review tenders.",
             },
             {
               number: "02 / DISCOVERY",
@@ -39,14 +37,14 @@ export default function ArchitecturePage() {
               text: "Read approved public pages, submit bounded runs, validate structured results, and preserve source links.",
             },
             {
-              number: "03 / INTELLIGENCE",
-              title: "Evidence before certainty",
-              text: "Version PDFs, extract exact clauses, compare five readiness checks, and explain amendments.",
+              number: "03 / CHECKOUT",
+              title: "A clear demo purchase",
+              text: "Review the source, acknowledge the demo, simulate payment and recover a receipt in My tenders.",
             },
             {
-              number: "04 / INFRASTRUCTURE",
-              title: "A planned AWS foundation",
-              text: "Amplify, EC2, RDS PostgreSQL, private S3, Secrets Manager, and CloudWatch.",
+              number: "04 / PERSISTENCE",
+              title: "Your supplier account",
+              text: "Existing Firebase identity, FastAPI workspace isolation and durable PostgreSQL demo orders.",
             },
           ].map((layer) => (
             <section className="architecture-layer" key={layer.number}>
@@ -63,8 +61,8 @@ export default function ArchitecturePage() {
         <ArchitectureDiagram diagram={ARCHITECTURE_DIAGRAM} />
         <div className="architecture-caption">
           <span>
-            Full target architecture · operational backend and AWS components
-            are planned
+            Simplified supplier workflow · simulated checkout with no real
+            charge
           </span>
           <a href="/architecture.mmd" download className="text-link">
             <Icon name="download" size={15} />

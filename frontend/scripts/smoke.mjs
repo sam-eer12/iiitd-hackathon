@@ -4,13 +4,14 @@ const base = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 const pages = [
   ["/", "Find the tender"],
   ["/dashboard", "Your tender shortlist"],
-  ["/dashboard/tenders", "Find your next good fit."],
+  ["/dashboard/tenders", "Find your next tender."],
   ["/dashboard/saved", "Your saved shortlist"],
+  ["/dashboard/purchases", "My tenders."],
   ["/dashboard/profile", "Your business, in focus."],
   ["/dashboard/sources", "IIIT-Delhi"],
   ["/dashboard/amendments", "No amendment links in this discovery."],
   ["/dashboard/settings", "Your workspace, your way."],
-  ["/dashboard/help", "Find your feet."],
+  ["/dashboard/help", "From sign-in to demo purchase."],
   ["/architecture", "From opportunity"],
   ["/samples/sample-1", "Illustrative sample document"],
   ["/architecture.mmd", "flowchart TB"],
@@ -54,6 +55,62 @@ const crossOrigin = await fetch(`${base}/api/discovery`, {
 });
 assert.equal(crossOrigin.status, 403);
 console.log("Cross-origin submission: rejected (403)");
+const unsignedPurchases = await fetch(`${base}/api/purchases`);
+assert.equal(unsignedPurchases.status, 401);
+const crossOriginCheckout = await fetch(`${base}/api/purchases`, {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer smoke-test",
+    Origin: "https://untrusted.example",
+    "Content-Type": "application/json",
+  },
+  body: "{}",
+});
+assert.equal(crossOriginCheckout.status, 403);
+const unsignedPayment = await fetch(
+  `${base}/api/purchases/00000000-0000-0000-0000-000000000000/pay`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome: "success" }),
+  },
+);
+assert.equal(unsignedPayment.status, 401);
+console.log("Checkout authorization and origin checks passed");
+for (const [body, expected] of [
+  ["{", 400],
+  [JSON.stringify({ tenderId: "missing" }), 422],
+  [
+    JSON.stringify({
+      tenderId: "missing",
+      reviewed: true,
+      demoAcknowledged: true,
+    }),
+    404,
+  ],
+  [
+    JSON.stringify({
+      tenderId: catalog.tenders[0]?.id ?? "missing",
+      reviewVersion: "stale",
+      reviewed: true,
+      demoAcknowledged: true,
+    }),
+    catalog.tenders.length ? 409 : 404,
+  ],
+]) {
+  const invalidCheckout = await fetch(`${base}/api/purchases`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer smoke-test",
+      "Content-Type": "application/json",
+    },
+    body,
+  });
+  assert.equal(invalidCheckout.status, expected);
+}
+console.log(
+  "Checkout rejects invalid payloads, unknown notices and stale reviews",
+);
 const unsigned = await fetch(
   `${base}/api/discovery/00000000-0000-0000-0000-000000000000`,
 );

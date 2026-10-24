@@ -60,6 +60,7 @@ const statusLabels = {
   submitting: "Starting verification",
   submission_unknown: "Session needs review",
   pending: "Waiting for document consent",
+  cancelled: "Session stopped",
   verified: "Issuer document verified",
   test_passed: "Test check passed",
   review: "Review needed",
@@ -94,15 +95,28 @@ export function CertificateVerificationPanel({
       kind === "gst"
         ? /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
         : /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-    if (
-      dirty ||
-      !subjectName.trim() ||
-      !pattern.test(number.trim().toUpperCase()) ||
-      !consent
-    ) {
+    if (dirty) {
+      setError("Save your profile changes before continuing.");
+      return;
+    }
+    if (!pattern.test(number.trim().toUpperCase())) {
       setError(
-        "Save your profile, enter the document number, and give consent before continuing.",
+        kind === "pan"
+          ? "Enter your PAN as 5 letters, 4 digits, then 1 letter (for example, ABCDE1234F)."
+          : "Enter a valid 15-character GSTIN as printed on your GST registration.",
       );
+      return;
+    }
+    if (subjectName.trim().length < 2) {
+      setError(
+        kind === "pan"
+          ? "Set Contact person to your full name as printed on your PAN, then save your profile."
+          : "Enter the registered business name in your profile, then save it.",
+      );
+      return;
+    }
+    if (!consent) {
+      setError("Give consent to share this document before continuing.");
       return;
     }
     setBusy(true);
@@ -130,17 +144,20 @@ export function CertificateVerificationPanel({
     }
   }
 
-  async function check() {
+  async function restart() {
     if (!latest) return;
     setBusy(true);
     setError("");
     try {
-      await verification.check(latest.id);
+      const response = await verification.restart(latest.id, flow);
+      if (response.authorizationUrl)
+        window.location.assign(response.authorizationUrl);
+      else await verification.refresh();
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The document status could not be checked.",
+          : "The OAuth session could not be restarted.",
       );
     } finally {
       setBusy(false);
@@ -148,7 +165,7 @@ export function CertificateVerificationPanel({
   }
 
   return (
-    <div className="certificate-verification-panel">
+    <div className="certificate-verification-panel" id="document-verification">
       <div className="verification-intro">
         <Icon name="shield" size={21} />
         <div>
@@ -205,14 +222,18 @@ export function CertificateVerificationPanel({
                 spellCheck={false}
                 maxLength={kind === "gst" ? 15 : 10}
                 value={number}
-                onChange={(event) =>
-                  setNumber(event.target.value.toUpperCase())
-                }
+                onChange={(event) => {
+                  setNumber(event.target.value.toUpperCase());
+                  setError("");
+                }}
                 placeholder={
-                  kind === "gst" ? "15-character GSTIN" : "10-character PAN"
+                  kind === "gst" ? "15-character GSTIN" : "ABCDE1234F (example)"
                 }
                 disabled={busy}
               />
+              {kind === "pan" && (
+                <small>Format: 5 letters, 4 digits, then 1 letter.</small>
+              )}
             </label>
             <label>
               {provider} account
@@ -334,9 +355,10 @@ export function CertificateVerificationPanel({
               type="button"
               className="button button-secondary button-small"
               disabled={busy}
-              onClick={() => void check()}
+              onClick={() => void restart()}
+              title={`Stop this session and restart ${provider} sign-in`}
             >
-              Check again
+              {busy ? "Restarting…" : "Check again"}
             </button>
           )}
         </div>

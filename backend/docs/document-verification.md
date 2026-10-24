@@ -23,6 +23,19 @@ Set these on the backend:
 - `ENTITYLOCKER_SIGNING_CERTIFICATE_PATH`: the trusted NeGD public signing certificate for EntityLocker GST documents. Configure the appropriate certificate for each enabled flow. The signer must be within its current validity period. Never trust a certificate merely because it is embedded in a user-supplied document. No private signing key is needed.
 - `CERTIFICATE_VERIFICATION_TTL_HOURS`: defaults to 24; accepted receipt duration is bounded to 1–168 hours and any document expiry, whichever is earlier.
 
+OAuth consent requires valid Sandbox credentials and the HTTPS return URL. A signing certificate is required when checking the returned document, rather than when opening consent. Without that certificate a completed consent stays in `review` and cannot award a verified badge.
+
+### Local demo callback
+
+Sandbox requires an HTTPS callback even when the frontend is at `http://localhost:3000`. Run the dedicated callback relay and expose only its port through a temporary HTTPS tunnel:
+
+```sh
+uv run python -m app.cli.digilocker_callback
+cloudflared tunnel --url http://127.0.0.1:8766 --no-autoupdate --protocol http2
+```
+
+Set `SANDBOX_RETURN_URL=https://<the-generated-host>.trycloudflare.com/callback` in the backend `.env`, then restart the backend (or trigger its development reloader). Keep both processes running throughout the demo; restarting the tunnel changes its hostname. The relay accepts only a verification UUID and redirects to the local profile. It does not forward provider tokens or codes, expose the application, or grant verification. For a deployed app, set the return URL directly to its public HTTPS profile page instead. See [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+
 The project's secret-safety rules require runtime injection through `asm-exec`, using references such as `{{resolve:secretsmanager:your-secret-id:SecretString:api_key}}` and `{{resolve:secretsmanager:your-secret-id:SecretString:api_secret}}`. Resolve these into the backend process environment. Do not put the reference itself in a credential field without the resolver, read raw Secrets Manager values into an agent session, commit credentials, or return them to the browser. The `aws-secrets-manager` skill and `asm-exec` must be available before using that live setup workflow. This change does not install live credentials or provision AWS infrastructure.
 
 Enable EntityLocker and GST Public/Search GSTIN access for the GST flow, and DigiLocker for PAN. Actual issuer consent must be completed by the document holder or authorized business representative. No Aadhaar numbers, OTPs, DigiLocker passwords, or scans are collected by TenderLens.

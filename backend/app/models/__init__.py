@@ -24,6 +24,7 @@ from app.models.models import (
     Workspace,
     WorkspaceMembership,
 )
+from app.models.purchases import DemoPurchase
 
 __all__ = [
     "AmendmentChange",
@@ -34,6 +35,7 @@ __all__ = [
     "CertificateVerification",
     "Document",
     "DocumentVersion",
+    "DemoPurchase",
     "Evaluation",
     "Finding",
     "ParseArtifact",

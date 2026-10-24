@@ -38,8 +38,8 @@ export default function Home() {
               worth <span className="serif-accent">your time.</span>
             </h1>
             <p className="hero-lede reveal reveal-2">
-              Less searching. Fewer surprises. A clearer view of the tenders
-              that fit your business—with the evidence to back it up.
+              Sign in, find official tenders with TinyFish, review the documents
+              and try a demo purchase. One clear supplier workflow.
             </p>
             <div className="hero-actions reveal reveal-3">
               <Link className="button button-primary" href="/dashboard">
@@ -73,11 +73,11 @@ export default function Home() {
             </li>
             <li>
               <Icon name="document" size={20} />
-              Clause-level evidence
+              Official tender documents
             </li>
             <li>
               <Icon name="history" size={20} />
-              Every amendment in view
+              Simple demo checkout
             </li>
             <li>
               <Icon name="shield" size={20} />
@@ -97,8 +97,8 @@ export default function Home() {
               </h2>
             </div>
             <p>
-              The right tender is more than a keyword match. Know what fits,
-              what blocks you, and what changed.
+              Set up once, review the source and complete a simulated purchase.
+              Keep your demo receipts together in My tenders.
             </p>
           </div>
           <div className="steps-grid">
@@ -111,8 +111,8 @@ export default function Home() {
               </div>
               <h3>One profile. A better starting point.</h3>
               <p>
-                Add your categories, experience, turnover, and certificates. Let
-                your capabilities guide your shortlist.
+                Sign in with Google and save your business details. Keep
+                DigiLocker verification connected to your supplier profile.
               </p>
               <Link className="text-link" href="/dashboard/profile">
                 Build your profile <Icon name="arrowRight" size={15} />
@@ -125,10 +125,10 @@ export default function Home() {
                 </span>
                 <span>02 / Your evidence</span>
               </div>
-              <h3>Readiness you can trace back.</h3>
+              <h3>Find a tender. Review the source.</h3>
               <p>
-                See each requirement beside your supplier facts. Open the exact
-                clause behind every check.
+                Fetch official notices with TinyFish. Check the closing date,
+                open the tender documents and read any amendments.
               </p>
               <Link className="text-link" href="/dashboard">
                 Explore the workspace <Icon name="arrowRight" size={15} />
@@ -139,15 +139,15 @@ export default function Home() {
                 <span className="step-icon">
                   <Icon name="history" size={22} />
                 </span>
-                <span>03 / Your next move</span>
+                <span>03 / Your demo purchase</span>
               </div>
-              <h3>Changes don’t have to be surprises.</h3>
+              <h3>Complete checkout. Keep the receipt.</h3>
               <p>
-                Keep the original notice and its amendments together. See the
-                before, the after, and what it means for you.
+                Try a simulated payment, retry a failure and download your demo
+                receipt. No real money is charged or bid submitted.
               </p>
-              <Link className="text-link" href="/dashboard/amendments">
-                See amendment tracking <Icon name="arrowRight" size={15} />
+              <Link className="text-link" href="/dashboard/purchases">
+                View My tenders <Icon name="arrowRight" size={15} />
               </Link>
             </article>
           </div>
@@ -174,11 +174,17 @@ export default function Home() {
             <div className="clarity-checks reveal-on-scroll">
               {[
                 {
-                  label: "Turnover & financial period",
+                  label: "Google sign-in & supplier profile",
                   icon: "building" as const,
                 },
-                { label: "Experience & certificates", icon: "shield" as const },
-                { label: "Deposit & closing deadline", icon: "clock" as const },
+                {
+                  label: "DigiLocker & official documents",
+                  icon: "shield" as const,
+                },
+                {
+                  label: "Demo checkout & saved receipt",
+                  icon: "checkCircle" as const,
+                },
               ].map((item) => (
                 <div key={item.label}>
                   <span>
@@ -189,8 +195,8 @@ export default function Home() {
                 </div>
               ))}
               <p>
-                <Icon name="link" size={14} /> Every extracted condition
-                includes its source and page.
+                <Icon name="link" size={14} /> Review the issuer’s documents for
+                actual fees, eligibility and submission instructions.
               </p>
             </div>
           </div>

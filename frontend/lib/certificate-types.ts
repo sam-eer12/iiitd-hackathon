@@ -11,6 +11,7 @@ export interface CertificateVerification {
     | "submitting"
     | "submission_unknown"
     | "pending"
+    | "cancelled"
     | "verified"
     | "test_passed"
     | "review"

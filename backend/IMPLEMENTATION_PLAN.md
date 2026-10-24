@@ -1,3 +1,9 @@
+# Current scope
+
+The [final simplified supplier workflow plan](../docs/IMPLEMENTATION_PLAN.md) supersedes this earlier backend roadmap. Google sign-in, profiles, DigiLocker and TinyFish are retained. The primary journey is now manual source review, hackathon demo checkout and receipts in My tenders. Advanced condition extraction and comparison below remain historical implementation context.
+
+---
+
 # TenderLens — Detailed Backend Implementation Plan
 
 **Status:** Proposed implementation; this document does not create a running backend.  

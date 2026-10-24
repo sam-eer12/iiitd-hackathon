@@ -1,11 +1,39 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { evaluateTender } from "@/lib/rules";
+import { useAuth } from "@/lib/auth-context";
+import { hasVerifiedDocument } from "@/lib/certificate-verification";
+import { tenderAvailability } from "@/lib/purchases";
+import type { DemoPurchase } from "@/lib/purchases";
 import type { Tender } from "@/lib/types";
+import { DemoCheckout } from "./demo-checkout";
 import { Icon } from "./icon";
-import { StatusBadge } from "./status-badge";
 import { useWorkspace } from "./workspace-provider";
+
+export function AvailabilityBadge({
+  status,
+}: {
+  status: "open" | "closed" | "unknown";
+}) {
+  return (
+    <span
+      className={`status-badge status-${status === "open" ? "meets" : status === "closed" ? "blocked" : "review"}`}
+    >
+      <Icon
+        name={
+          status === "open" ? "clock" : status === "closed" ? "close" : "alert"
+        }
+        size={13}
+      />
+      {status === "open"
+        ? "Open"
+        : status === "closed"
+          ? "Closed"
+          : "Deadline unconfirmed"}
+    </span>
+  );
+}
 
 export function TenderDrawer({
   tender,
@@ -15,34 +43,38 @@ export function TenderDrawer({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const { user, signInWithGoogle } = useAuth();
   const {
     profile,
     savedIds,
     toggleSaved,
     evaluationTime,
-    verifiedCertificates,
+    certificateVerification,
+    purchaseFlow,
   } = useWorkspace();
-  const [tab, setTab] = useState("readiness");
-  const evaluation = evaluateTender(
-    tender,
-    profile,
-    new Date(evaluationTime),
-    verifiedCertificates,
+  const [reviewed, setReviewed] = useState(false);
+  const [demoAcknowledged, setDemoAcknowledged] = useState(false);
+  const [order, setOrder] = useState<DemoPurchase | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const availability = tenderAvailability(tender, new Date(evaluationTime));
+  const existing = purchaseFlow.orders.find(
+    (item) => item.tender.id === tender.id,
   );
-  const deadline = tender.deadline ? new Date(tender.deadline) : null;
-  const checkCounts = {
-    meets: evaluation.findings.filter((finding) => finding.status === "meets")
-      .length,
-    review: evaluation.findings.filter((finding) => finding.status === "review")
-      .length,
-    blocked: evaluation.findings.filter(
-      (finding) => finding.status === "blocked",
-    ).length,
-  };
+  const profileComplete = Boolean(
+    profile.company.trim() &&
+    profile.contact.trim() &&
+    profile.email.includes("@") &&
+    profile.categories.length,
+  );
+  const identityVerified = certificateVerification.records.some(
+    (record) =>
+      record.kind === "pan" &&
+      hasVerifiedDocument(record, profile, new Date(evaluationTime)),
+  );
 
   useEffect(() => {
     const element = dialog.current;
-    // Return focus to whatever opened the review once it closes.
     const opener =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -53,6 +85,27 @@ export function TenderDrawer({
       if (opener?.isConnected) opener.focus();
     };
   }, []);
+
+  async function checkout() {
+    if (existing?.status === "purchased") {
+      setOrder(existing);
+      return;
+    }
+    if (busy || !reviewed || !demoAcknowledged) return;
+    setBusy(true);
+    setError("");
+    try {
+      setOrder(await purchaseFlow.start(tender));
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Could not start checkout.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <dialog
@@ -66,7 +119,9 @@ export function TenderDrawer({
     >
       <div className="drawer-content">
         <div className="drawer-top">
-          <span className="eyebrow">TENDER REVIEW</span>
+          <span className="eyebrow">
+            {order ? "DEMO CHECKOUT" : "REVIEW TENDER"}
+          </span>
           <button
             className="icon-button"
             aria-label="Close tender review"
@@ -76,255 +131,67 @@ export function TenderDrawer({
           </button>
         </div>
         <div className="drawer-heading">
-          <span className="category-pill">{tender.category}</span>
+          <AvailabilityBadge status={availability} />
           <h2 id="tender-dialog-title">{tender.title}</h2>
           <p>
             {tender.issuer} <span>·</span> {tender.reference}
           </p>
           <dl className="drawer-facts">
             <div>
-              <dt>Closes</dt>
+              <dt>Submission deadline</dt>
               <dd>
-                {deadline
-                  ? deadline.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      timeZone: "Asia/Kolkata",
-                    })
-                  : (tender.deadlineText ?? "Not stated")}
-                <small>
-                  {deadline
-                    ? `${deadline.toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                        timeZone: "Asia/Kolkata",
-                      })} IST`
-                    : "As listed · verify source"}
-                </small>
+                {tender.deadlineText ?? "Not provided"}
+                <small>As published by the issuer</small>
               </dd>
             </div>
             <div>
-              <dt>Estimated value</dt>
+              <dt>Official documents</dt>
               <dd>
-                {tender.value}
-                <small>PDF extraction pending</small>
+                {tender.pdfUrls.length}
+                <small>{tender.amendmentUrls.length} amendment links</small>
               </dd>
             </div>
             <div>
-              <dt>Checks</dt>
+              <dt>Issuer’s tender fee</dt>
               <dd>
-                {evaluation.findings.length
-                  ? `${checkCounts.meets} of ${evaluation.findings.length} meet`
-                  : "None extracted"}
-                <small>
-                  {evaluation.findings.length
-                    ? [
-                        checkCounts.review && `${checkCounts.review} to review`,
-                        checkCounts.blocked && `${checkCounts.blocked} blocked`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "No open issues"
-                    : "PDF checks pending"}
-                </small>
+                Check official notice
+                <small>No fee extracted from this listing</small>
               </dd>
             </div>
           </dl>
           <div className="drawer-heading-bottom">
-            <StatusBadge status={evaluation.status} />
+            <span className="muted">
+              {order
+                ? "Review → Demo checkout → Receipt"
+                : "Review the notice, then choose your next step."}
+            </span>
             <button
               className={`button button-secondary button-small ${savedIds.includes(tender.id) ? "button-selected" : ""}`}
+              aria-pressed={savedIds.includes(tender.id)}
               onClick={() => toggleSaved(tender.id)}
             >
               <Icon name="bookmark" size={15} />
-              {savedIds.includes(tender.id) ? "Saved" : "Save tender"}
+              {savedIds.includes(tender.id) ? "Saved" : "Save for later"}
             </button>
           </div>
         </div>
-        <div className="provenance-banner provenance-live">
-          <Icon name="globe" size={16} />
-          <span>
-            Collected from the official source with TinyFish. PDF extraction and
-            clause verification are pending; readiness is unresolved.
-          </span>
-        </div>
-        <div className="drawer-tabs" aria-label="Tender review sections">
-          {["readiness", "evidence", "changes"].map((value) => (
-            <button
-              key={value}
-              className={value === tab ? "selected" : ""}
-              aria-pressed={tab === value}
-              onClick={() => setTab(value)}
-            >
-              {value === "readiness"
-                ? "Readiness checks"
-                : value === "evidence"
-                  ? "Source evidence"
-                  : "Amendment links"}
-            </button>
-          ))}
-        </div>
-        {tab === "readiness" && (
-          <div className="drawer-body">
-            <div className="drawer-summary">
-              <h3>What fits. What needs a closer look.</h3>
-              <p>Requirements compared with your current supplier profile.</p>
-            </div>
-            {!evaluation.coverageComplete && (
-              <div className="inline-notice">
-                <Icon name="alert" size={18} />
-                <p>
-                  Clause coverage is incomplete. Download the source documents
-                  and review all five condition groups before relying on a
-                  readiness result.
-                </p>
-              </div>
-            )}
-            {!evaluation.findings.length && (
-              <a
-                className="document-card"
-                href={tender.pdfUrls[0] ?? tender.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Icon name="document" size={22} />
-                Review the official tender document
-                <Icon name="arrow" size={17} />
-              </a>
-            )}
-            <div className="condition-list">
-              {evaluation.findings.map((finding) => (
-                <details
-                  className="condition-item"
-                  key={finding.condition.type}
-                >
-                  <summary>
-                    <span
-                      className={`condition-status-icon status-${finding.status}`}
-                    >
-                      <Icon
-                        name={
-                          finding.status === "meets"
-                            ? "check"
-                            : finding.status === "blocked"
-                              ? "close"
-                              : "clock"
-                        }
-                        size={16}
-                      />
-                    </span>
-                    <span>
-                      <strong>{finding.condition.label}</strong>
-                      <small>{finding.condition.requirement}</small>
-                    </span>
-                    <StatusBadge status={finding.status} short />
-                    <Icon name="chevronDown" size={16} />
-                  </summary>
-                  <div className="condition-detail">
-                    <div>
-                      <span>YOUR PROFILE</span>
-                      <strong>{finding.supplierValue}</strong>
-                    </div>
-                    <p>{finding.reason}</p>
-                    <blockquote>“{finding.condition.quote}”</blockquote>
-                    <a
-                      href={`${tender.pdfUrls[0] ?? tender.sourceUrl}#page=${finding.condition.page}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Icon name="document" size={14} />
-                      Source clause {finding.condition.clause} · page{" "}
-                      {finding.condition.page}
-                      <Icon name="arrow" size={13} />
-                    </a>
-                  </div>
-                </details>
-              ))}
-            </div>
-            <div className="decision-note">
-              <Icon name="shield" size={19} />
-              <p>
-                <strong>You make the final call.</strong> Meets checked
-                conditions describes the supported checks. Always review the
-                full notice and applicable terms before bidding.
+        {order ? (
+          <DemoCheckout
+            key={order.id}
+            initialOrder={order}
+            onBack={() => setOrder(null)}
+          />
+        ) : (
+          <div className="drawer-body tender-review-body">
+            <section aria-labelledby="review-documents-heading">
+              <h3 id="review-documents-heading">
+                1. Review the official documents
+              </h3>
+              <p className="muted">
+                Check the specifications, eligibility, fee, EMD and submission
+                instructions in the source notice.
               </p>
-            </div>
-          </div>
-        )}
-        {tab === "evidence" && (
-          <div className="drawer-body">
-            <h3>Keep the source within reach.</h3>
-            <p className="muted">
-              Evidence should be easy to inspect, not just easy to trust.
-            </p>
-            {tender.pdfUrls.map((url, index) => (
-              <a
-                className="document-card"
-                key={url}
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Icon name="document" size={24} />
-                <span>
-                  <strong>Source PDF {index + 1}</strong>
-                  <small>Official document · clause verification pending</small>
-                </span>
-                <Icon name="arrow" size={17} />
-              </a>
-            ))}
-            {!tender.pdfUrls.length && (
-              <div className="inline-notice">
-                No PDF link was returned for this notice. Review the public
-                source.
-              </div>
-            )}
-            <a
-              className="document-card"
-              href={tender.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="document-card-icon">
-                <Icon name="globe" size={24} />
-              </span>
-              <span>
-                <strong>Public tender listing</strong>
-                <small>{new URL(tender.sourceUrl).hostname}</small>
-              </span>
-              <Icon name="arrow" size={18} />
-            </a>
-            <div className="evidence-metadata">
-              <div>
-                <span>Submission deadline (source text)</span>
-                <strong>{tender.deadlineText ?? "Not provided"}</strong>
-              </div>
-              <div>
-                <span>Collection mode</span>
-                <strong>TinyFish source snapshot</strong>
-              </div>
-              <div>
-                <span>Observation time</span>
-                <strong>
-                  {new Date(tender.retrievedAt).toLocaleString("en-GB", {
-                    timeZone: "Asia/Kolkata",
-                  })}{" "}
-                  IST
-                </strong>
-              </div>
-              <div>
-                <span>Verification</span>
-                <strong>PDF clause verification pending</strong>
-              </div>
-            </div>
-          </div>
-        )}
-        {tab === "changes" && (
-          <div className="drawer-body">
-            <h3>Every change, in context.</h3>
-            {tender.amendmentUrls.length ? (
-              tender.amendmentUrls.map((url, index) => (
+              {tender.pdfUrls.map((url, index) => (
                 <a
                   className="document-card"
                   key={url}
@@ -332,21 +199,201 @@ export function TenderDrawer({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <Icon name="document" size={20} />
-                  Amendment {index + 1} · comparison pending
+                  <Icon name="document" size={22} />
+                  <span>
+                    <strong>Tender document {index + 1}</strong>
+                    <small>Official PDF · opens in a new tab</small>
+                  </span>
                   <Icon name="arrow" size={17} />
                 </a>
-              ))
-            ) : (
-              <div className="empty-state">
-                <Icon name="history" size={30} />
-                <h3>No amendment links collected.</h3>
-                <p>
-                  Check the public source for any subsequent changes to this
-                  notice.
-                </p>
-              </div>
-            )}
+              ))}
+              {tender.amendmentUrls.map((url, index) => (
+                <a
+                  className="document-card"
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Icon name="history" size={22} />
+                  <span>
+                    <strong>Amendment {index + 1}</strong>
+                    <small>Read this alongside the original notice</small>
+                  </span>
+                  <Icon name="arrow" size={17} />
+                </a>
+              ))}
+              <a
+                className="document-card"
+                href={tender.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Icon name="globe" size={22} />
+                <span>
+                  <strong>Official tender listing</strong>
+                  <small>{new URL(tender.sourceUrl).hostname}</small>
+                </span>
+                <Icon name="arrow" size={17} />
+              </a>
+              <p className="review-source-note">
+                Collected by TinyFish on{" "}
+                {new Date(tender.retrievedAt).toLocaleString("en-GB", {
+                  timeZone: "Asia/Kolkata",
+                })}{" "}
+                IST. Check the source for updates. Eligibility has not been
+                automatically verified.
+              </p>
+            </section>
+            <section aria-labelledby="review-supplier-heading">
+              <h3 id="review-supplier-heading">
+                2. Check your supplier details
+              </h3>
+              <dl className="checkout-summary">
+                <div>
+                  <dt>Google account</dt>
+                  <dd>{user?.email ?? "Sign in to continue"}</dd>
+                </div>
+                <div>
+                  <dt>Business</dt>
+                  <dd>
+                    {user && profileComplete
+                      ? profile.company
+                      : "Complete and save your profile"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>DigiLocker identity</dt>
+                  <dd>
+                    {identityVerified
+                      ? "Verified"
+                      : "Optional for demo checkout"}
+                  </dd>
+                </div>
+              </dl>
+              <Link
+                className="text-link"
+                href="/dashboard/profile"
+                onClick={onClose}
+              >
+                Manage profile & DigiLocker <Icon name="arrowRight" size={15} />
+              </Link>
+              <p className="review-source-note">
+                DigiLocker verification stays available in your profile. An
+                unverified identity can try this demo and remains labelled
+                unverified on the receipt.
+              </p>
+            </section>
+            <section
+              className="checkout-card"
+              aria-labelledby="review-purchase-heading"
+            >
+              <span className="subtle-tag">
+                HACKATHON DEMO · NO REAL CHARGE
+              </span>
+              <h3 id="review-purchase-heading">3. Buy in the demo</h3>
+              <p>
+                Try a simulated purchase for <strong>₹499</strong>. This is a
+                demo amount, not the issuer’s fee. It does not submit a bid,
+                reserve an opportunity or award a contract.
+              </p>
+              {existing?.status === "purchased" ? (
+                <button
+                  className="button button-primary"
+                  onClick={() => void checkout()}
+                >
+                  <Icon name="checkCircle" size={17} />
+                  View demo receipt
+                </button>
+              ) : (
+                <>
+                  {availability !== "open" && (
+                    <div className="inline-notice" role="status">
+                      {availability === "closed"
+                        ? "This tender has closed. You can review or save its documents; checkout is unavailable."
+                        : "The closing date is unconfirmed. Check the official notice before checkout."}
+                    </div>
+                  )}
+                  <label className="checkout-consent">
+                    <input
+                      type="checkbox"
+                      checked={reviewed}
+                      onChange={(event) => setReviewed(event.target.checked)}
+                      disabled={availability !== "open"}
+                    />
+                    <span>
+                      I have reviewed the official notice and any amendments.
+                    </span>
+                  </label>
+                  <label className="checkout-consent">
+                    <input
+                      type="checkbox"
+                      checked={demoAcknowledged}
+                      onChange={(event) =>
+                        setDemoAcknowledged(event.target.checked)
+                      }
+                      disabled={availability !== "open"}
+                    />
+                    <span>
+                      I understand this is a simulated purchase with no real
+                      payment or bid submission.
+                    </span>
+                  </label>
+                  {!user ? (
+                    <button
+                      className="button button-primary"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError("");
+                        try {
+                          await signInWithGoogle();
+                        } catch {
+                          setError(
+                            "Google sign-in did not finish. Please try again.",
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Sign in with Google
+                    </button>
+                  ) : !profileComplete ? (
+                    <Link
+                      className="button button-primary"
+                      href="/dashboard/profile"
+                      onClick={onClose}
+                    >
+                      Complete supplier profile{" "}
+                      <Icon name="arrowRight" size={16} />
+                    </Link>
+                  ) : (
+                    <button
+                      className="button button-primary"
+                      disabled={
+                        busy ||
+                        !reviewed ||
+                        !demoAcknowledged ||
+                        availability !== "open"
+                      }
+                      aria-busy={busy}
+                      onClick={() => void checkout()}
+                    >
+                      {busy
+                        ? "Starting checkout…"
+                        : "Continue to demo checkout"}
+                      <Icon name="arrowRight" size={16} />
+                    </button>
+                  )}
+                </>
+              )}
+              {error && (
+                <div className="error-banner" role="alert">
+                  {error}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </div>

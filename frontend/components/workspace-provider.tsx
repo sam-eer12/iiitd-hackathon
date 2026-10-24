@@ -11,6 +11,7 @@ import {
 } from "react";
 import { hasVerifiedDocument } from "@/lib/certificate-verification";
 import { useCertificateVerification } from "@/lib/use-certificate-verification";
+import { useDemoPurchases } from "@/lib/use-demo-purchases";
 import { useAuth } from "@/lib/auth-context";
 import { auth } from "@/lib/firebase";
 import { DEFAULT_PROFILE } from "@/lib/demo-data";
@@ -47,6 +48,7 @@ function readStoredWorkspace(key: string): StoredWorkspace {
 }
 
 interface WorkspaceContextValue extends StoredWorkspace {
+  purchaseFlow: ReturnType<typeof useDemoPurchases>;
   certificateVerification: ReturnType<typeof useCertificateVerification>;
   verifiedCertificates: readonly (keyof SupplierProfile["certificates"])[];
   ready: boolean;
@@ -79,6 +81,7 @@ function WorkspaceStateProvider({ children }: { children: React.ReactNode }) {
   const storageKey = user ? `${STORAGE_KEY}.${user.uid}` : STORAGE_KEY;
   const [profileLoaded, setProfileLoaded] = useState(!user);
   const certificateVerification = useCertificateVerification();
+  const purchaseFlow = useDemoPurchases();
   const ready = useSyncExternalStore(
     readySubscribe,
     () => true,
@@ -292,6 +295,7 @@ function WorkspaceStateProvider({ children }: { children: React.ReactNode }) {
   const value: WorkspaceContextValue = {
     ...stored,
     certificateVerification,
+    purchaseFlow,
     verifiedCertificates,
     ready: ready && loaded && profileLoaded,
     tenders: stored.liveTenders,

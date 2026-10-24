@@ -1,70 +1,68 @@
 import Link from "next/link";
-import { Icon } from "@/components/icon";
+import { Icon, type IconName } from "@/components/icon";
 
 export const metadata = { title: "Help & getting started" };
 
 export default function HelpPage() {
+  const steps: {
+    title: string;
+    text: string;
+    href: string;
+    action: string;
+    icon: IconName;
+  }[] = [
+    {
+      title: "1. Sign in and save your profile",
+      text: "Use Google sign-in. Save your business name, contact, email and supply categories so checkout has the right supplier details.",
+      href: "/dashboard/profile",
+      action: "Open supplier profile",
+      icon: "building",
+    },
+    {
+      title: "2. Connect DigiLocker",
+      text: "Verify the contact person’s PAN through DigiLocker. GST verification uses EntityLocker. Test checks and unverified identities remain clearly labelled; verification is optional for the demo checkout.",
+      href: "/dashboard/profile#document-verification",
+      action: "Open document verification",
+      icon: "shield",
+    },
+    {
+      title: "3. Fetch and review tenders",
+      text: "Fetch notices from the official IIIT-Delhi listing with TinyFish. Open a tender, check the deadline and review the official PDFs and any amendments. Actual fees and eligibility come from the issuer’s documents.",
+      href: "/dashboard/tenders",
+      action: "Find a tender",
+      icon: "search",
+    },
+    {
+      title: "4. Buy in the demo",
+      text: "Acknowledge your review and the demo, then simulate a successful or failed payment. A successful attempt saves a downloadable demo receipt in My tenders. ₹499 is a demo amount; nothing is charged, reserved or submitted to the issuer.",
+      href: "/dashboard/purchases",
+      action: "View My tenders",
+      icon: "checkCircle",
+    },
+  ];
   return (
     <>
       <div className="workspace-heading">
         <div>
-          <div className="eyebrow">A LITTLE GUIDANCE GOES A LONG WAY</div>
-          <h1>Find your feet. Then your next fit.</h1>
-          <p>Here’s how to get the most from your TenderLens workspace.</p>
+          <div className="eyebrow">THE SUPPLIER WORKFLOW</div>
+          <h1>From sign-in to demo purchase.</h1>
+          <p>
+            Four steps, with the official tender documents always within reach.
+          </p>
         </div>
       </div>
       <div className="help-grid">
-        <article className="help-card">
-          <Icon name="building" size={25} />
-          <h2>Start with your supplier profile.</h2>
-          <p>
-            Add your annual turnover, completed supply orders, available deposit
-            funds, and certificate status. Leave unknown facts blank. Saving a
-            profile updates supported readiness checks when verified
-            requirements are available.
-          </p>
-          <Link className="text-link" href="/dashboard/profile">
-            Open supplier profile <Icon name="arrowRight" size={15} />
-          </Link>
-        </article>
-        <article className="help-card">
-          <Icon name="shield" size={25} />
-          <h2>Read the readiness labels.</h2>
-          <p>
-            Meets checked conditions means all five supported checks passed.
-            Blocked means a known mandatory check failed. Review needed means
-            information or evidence is missing or uncertain. Always inspect the
-            complete source before bidding.
-          </p>
-          <Link className="text-link" href="/dashboard">
-            Review your shortlist <Icon name="arrowRight" size={15} />
-          </Link>
-        </article>
-        <article className="help-card">
-          <Icon name="document" size={25} />
-          <h2>Open the evidence.</h2>
-          <p>
-            Select a tender and open Source evidence to view the official
-            documents collected by TinyFish. Readiness stays Review needed until
-            the source clauses are extracted and verified.
-          </p>
-          <Link className="text-link" href="/dashboard/tenders">
-            Discover tenders <Icon name="arrowRight" size={15} />
-          </Link>
-        </article>
-        <article className="help-card">
-          <Icon name="globe" size={25} />
-          <h2>Try live discovery with TinyFish.</h2>
-          <p>
-            Configure your server-side API key and start a source run.
-            TenderLens shows progress and preserves your previous results on
-            failure. The developer’s MCP connection and the application’s API
-            key configuration are separate.
-          </p>
-          <Link className="text-link" href="/dashboard/sources">
-            Check connected sources <Icon name="arrowRight" size={15} />
-          </Link>
-        </article>
+        {steps.map((step) => (
+          <article className="help-card" key={step.title}>
+            <Icon name={step.icon} size={25} />
+            <h2>{step.title}</h2>
+            <p>{step.text}</p>
+            <Link className="text-link" href={step.href}>
+              {step.action}
+              <Icon name="arrowRight" size={15} />
+            </Link>
+          </article>
+        ))}
       </div>
     </>
   );

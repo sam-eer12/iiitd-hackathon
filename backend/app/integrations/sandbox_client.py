@@ -4,7 +4,6 @@ import logging
 import re
 import time
 from functools import lru_cache
-from pathlib import Path
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -28,6 +27,7 @@ def signing_certificate_path(settings: Settings, provider: str) -> str | None:
 
 
 def configuration_ready(settings: Settings, provider: str | None = None) -> bool:
+    """Whether consent can start; issuer trust is checked when verifying the document."""
     key = settings.SANDBOX_API_KEY.get_secret_value() if settings.SANDBOX_API_KEY else ""
     secret = settings.SANDBOX_API_SECRET.get_secret_value() if settings.SANDBOX_API_SECRET else ""
     try:
@@ -40,21 +40,12 @@ def configuration_ready(settings: Settings, provider: str | None = None) -> bool
             and not url.query
             and not url.fragment
         )
-        paths = (
-            [signing_certificate_path(settings, provider)]
-            if provider
-            else [
-                settings.DIGILOCKER_SIGNING_CERTIFICATE_PATH,
-                settings.ENTITYLOCKER_SIGNING_CERTIFICATE_PATH,
-            ]
-        )
         return bool(
             key
             and secret
             and key != secret
             and key.startswith(f"key_{settings.SANDBOX_ENVIRONMENT}_")
             and valid_url
-            and any(path and Path(path).is_file() for path in paths)
         )
     except (ValueError, OSError):
         return False
@@ -109,7 +100,7 @@ class SandboxClient:
         if not configuration_ready(self.settings, provider):
             raise AppError(
                 "VERIFICATION_NOT_CONFIGURED",
-                "Document verification needs separate Sandbox server credentials, an HTTPS return URL, and the trusted issuer signing certificate.",
+                "Document consent needs separate Sandbox server credentials matching the selected environment and an HTTPS return URL (SANDBOX_RETURN_URL).",
                 503,
             )
 
@@ -186,9 +177,8 @@ class SandboxClient:
             "flow": flow,
             "redirect_url": redirect_url,
         }
-        if provider == "entitylocker":
-            payload["consent_expiry"] = expires_at
-        else:
+        payload["consent_expiry"] = expires_at
+        if provider == "digilocker":
             payload["doc_types"] = ["pan"]
         data = await self._call("POST", f"/kyc/{provider}/sessions/init", payload)
         try:

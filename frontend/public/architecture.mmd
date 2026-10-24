@@ -1,59 +1,26 @@
 flowchart TB
-  subgraph experience["TENDERLENS · PRODUCT EXPERIENCE"]
-    Visitor["Supplier"] --> Landing["Public landing page"]
-    Landing --> Dashboard["Dashboard · collapsible sidebar"]
-    Dashboard --> Shortlist["Discover and save tenders"]
-    Dashboard --> Profile["Supplier profile"]
-    Dashboard --> Evidence["Clause evidence and readiness"]
-    Dashboard --> History["Amendment history"]
+  Supplier["Supplier"] --> Google["Google sign-in"]
+  Google --> Profile["Save supplier profile"]
+  Profile --> Verify["DigiLocker identity / EntityLocker GST"]
+  Verify --> Fetch["Fetch tenders with TinyFish"]
+  Fetch --> Review["Review official notice, deadline and PDFs"]
+  Review --> Saved["Save for later"]
+  Review --> Checkout["Hackathon demo checkout - no real charge"]
+  Checkout --> Outcome{"Simulated payment"}
+  Outcome -->|Failure| Retry["Retry the same order"]
+  Retry --> Checkout
+  Outcome -->|Success| Receipt["DEMO receipt in My tenders"]
+  subgraph Application["Existing application and integrations"]
+    Web["Next.js server routes"] --> API["FastAPI - authenticated workspace"]
+    API --> DB[("PostgreSQL - profiles and demo purchases")]
+    Web --> Catalog["Dated tender catalog"]
+    Catalog --> TF["TinyFish - read-only source collection"]
+    API --> Locker["Existing DigiLocker / EntityLocker integration"]
   end
-  subgraph app["APPLICATION · NEXT.JS + FASTAPI"]
-    Dashboard --> Proxy["Next.js server API layer"]
-    Proxy --> API["FastAPI · validated application API"]
-    API --> Jobs["Durable refresh jobs"]
-    Jobs --> Worker["Python worker · bounded retries"]
-    Profile --> API
-  end
-  subgraph collection["TINYFISH · PUBLIC SOURCE COLLECTION"]
-    Worker -->|"Submit /run-async"| Agent["TinyFish Agent API"]
-    Worker -->|"Poll /runs/id"| Agent
-    Agent --> Portal["Allowlisted tender pages · IIIT-Delhi"]
-    Portal --> Notices["Notice links and corrigenda"]
-    Notices --> Validation["Validate structured output and source URLs"]
-  end
-  subgraph intelligence["EVIDENCE AND DECISION PIPELINE"]
-    Validation --> Download["Download PDFs · SHA-256 versioning"]
-    Download --> Parse["PyMuPDF · page and clause extraction"]
-    Parse --> Rules["Deterministic readiness checks"]
-    Rules --> Checks["Turnover · experience · certificates · EMD · deadline"]
-    Parse --> Diff["Document and condition comparison"]
-    Diff --> Rules
-    Checks --> Result["Meets checked conditions · Blocked · Review needed"]
-    Result --> API
-    Diff --> API
-  end
-  subgraph aws["PLANNED AWS DEPLOYMENT"]
-    Amplify["Amplify · Next.js hosting"]
-    EC2["EC2 Docker · API and worker"]
-    DB[("RDS PostgreSQL · profiles, jobs, versions, evaluations")]
-    S3[("Private S3 · PDFs and snapshots")]
-    Secrets["Secrets Manager · server-only API key"]
-    Logs["CloudWatch · run and error logs"]
-  end
-  Landing -.-> Amplify
-  API -.-> EC2
-  Worker --> DB
-  API --> DB
-  Download --> S3
-  Evidence --> Proxy
-  History --> Proxy
-  API --> S3
-  Secrets --> Worker
-  Worker --> Logs
-  API --> Logs
-  classDef green fill:#e9f1e8,stroke:#41634b,color:#173b2e
-  classDef dark fill:#173b2e,stroke:#173b2e,color:#fff
-  classDef yellow fill:#f5f1d7,stroke:#b3a45e,color:#594c20
-  class Dashboard,Landing,Result dark
-  class Agent,Validation,Download,Parse,Rules,Diff,Checks green
-  class Secrets,Logs yellow
+  Fetch --> Catalog
+  Profile --> Web
+  Verify --> Locker
+  Checkout --> Web
+  Receipt --> DB
+  classDef primary fill:#173b2e,stroke:#41634b,color:#fff
+  class Google,Review,Checkout,Receipt primary

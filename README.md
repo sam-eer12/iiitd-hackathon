@@ -1,6 +1,8 @@
 # TenderLens
 
-Find the tender worth your time. TenderLens helps small suppliers discover relevant notices, compare supported requirements with their profile, and inspect the evidence behind a readiness result.
+Find, review and buy in one supplier workspace. TenderLens keeps Google sign-in, supplier profiles, DigiLocker and TinyFish discovery, with a clearly labelled hackathon demo checkout and saved receipts.
+
+**Final flow:** Google sign-in → save supplier profile → DigiLocker → fetch tenders with TinyFish → review official documents → demo checkout → receipt in My tenders. DigiLocker remains optional for the demo; unverified identities stay labelled unverified. See the [final workflow implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## Run locally
 
@@ -14,19 +16,33 @@ npm run dev
 
 Open [the landing page](http://localhost:3000), [the dashboard](http://localhost:3000/dashboard), or [the architecture diagram](http://localhost:3000/architecture).
 
+Use `localhost` for Google sign-in: it is an authorized Firebase domain for this project. In development, browser visits to `127.0.0.1` redirect to `localhost`, preserving the port, path, and query. Additional hosted domains must be added in Firebase Authentication > Settings > Authorized domains.
+
 ## Current implementation
 
 - Responsive landing page and dashboard with a collapsible desktop sidebar and mobile navigation.
-- Searchable tender list, category/readiness filters, sorting, bookmarks, and JSON shortlist export.
-- Editable supplier profile and conservative readiness labels; real notices stay Review needed until their clauses are verified.
-- Evidence drawer with official tender PDFs, original deadline text, observation timestamps, and collected amendment links.
+- Searchable tender list, open/closed/deadline-unconfirmed filters, sorting and save-for-later bookmarks.
+- Existing Google sign-in, editable supplier profile and DigiLocker/EntityLocker document verification.
+- Simplified review with official PDFs, original deadline text, collection time and amendment links.
+- Demo checkout with simulated success/failure, retryable failures and one durable order per supplier and tender.
+- My tenders at `/dashboard/purchases` with account-owned history, resumable checkout and downloadable demo receipts.
 - Browser persistence for profile, bookmarks, sidebar preference, and discovery results.
 - Server-only TinyFish async discovery adapter with bounded runs, structured result validation, exact source-host validation, signed job access, and local run records.
-- Complete target architecture rendered with Mermaid in the app and generated through Mermaid Charts.
+- Simplified supplier workflow and application architecture rendered with Mermaid in the app.
 
 The default workspace contains **five real IIIT-Delhi notices collected with TinyFish on 24 October 2026**. The recorded API result, collection time, and provider run ID are in `frontend/lib/data/iiitd-tenders.json`. The listing includes recently closed notices with their actual deadlines. No tender prices, eligibility clauses, or amendment changes are invented. Synthetic fixtures remain available only for rule tests and explicitly labelled sample-document routes.
 
-The dashboard loads the latest completed source snapshot from `GET /api/tenders`, falling back to the recorded real snapshot. Completed application runs update the shared catalog; failed refreshes preserve it. Browser storage retains the supplier profile and bookmarks, and stable source identities preserve bookmarks across refreshes. Old sample workspaces migrate to real notices automatically. Live PDF clause verification and amendment comparison remain pending in this dashboard. The separate FastAPI API and worker are in `backend/`; the dashboard currently uses the Next.js discovery routes and local server files.
+The dashboard loads the latest completed source snapshot from `GET /api/tenders`, falling back to the recorded real snapshot. Completed runs update the catalog; failed refreshes preserve it. Browser storage retains the supplier profile and bookmarks, and stable source identities preserve bookmarks across refreshes. Signed-in profiles, document verification and demo purchases use FastAPI in `backend/`. Existing local and remote TinyFish discovery modes remain supported. Advanced readiness scoring and amendment comparison are outside the simplified primary flow.
+
+Demo checkout requires the existing backend and PostgreSQL database. Apply the new migration before starting the API:
+
+```sh
+cd backend
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+The displayed ₹499 is a fixed simulated amount, not an issuer fee. Actually charged: ₹0. No banking data, bid submission, exclusive reservation or contract award is involved. Official documents remain public. Orders and receipts are saved in PostgreSQL, not browser storage; an unavailable backend shows an error instead of a success receipt.
 
 ## Enable TinyFish discovery
 
@@ -62,7 +78,7 @@ GitHub Actions runs on pushes, pull requests, and manual dispatches. It uses Nod
 - [Product requirements](docs/PRD.md)
 - [Architecture and integration contracts](docs/ARCHITECTURE.md)
 - [Full architecture Mermaid source](docs/architecture.mmd)
-- [24-hour implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Final simplified workflow implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Detailed backend implementation plan](backend/IMPLEMENTATION_PLAN.md)
 - [Current build status and verification](docs/BUILD_STATUS.md)
 

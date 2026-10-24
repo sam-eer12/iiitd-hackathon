@@ -76,17 +76,24 @@ except ClientError as exc:
         raise
     change_type = "CREATE"
 change_name = "release-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S-") + uuid4().hex[:6]
+parameters = [
+    {"ParameterKey": key, "ParameterValue": value}
+    for key, value in values.items()
+    if key in body["Parameters"]
+]
+if change_type == "UPDATE":
+    parameters.extend(
+        {"ParameterKey": item["ParameterKey"], "UsePreviousValue": True}
+        for item in current["Parameters"]
+        if item["ParameterKey"] not in values and item["ParameterKey"] in body["Parameters"]
+    )
 response = cf.create_change_set(
     StackName=names[args.stack],
     ChangeSetName=change_name,
     ChangeSetType=change_type,
     TemplateBody=json.dumps(body),
     Capabilities=["CAPABILITY_IAM"],
-    Parameters=[
-        {"ParameterKey": key, "ParameterValue": value}
-        for key, value in values.items()
-        if key in body["Parameters"]
-    ],
+    Parameters=parameters,
     Tags=[{"Key": "Project", "Value": "TenderLens"}],
 )
 change_id = response["Id"]

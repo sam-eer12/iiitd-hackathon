@@ -12,7 +12,7 @@ const navigation: { href: string; label: string; icon: IconName }[] = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
   { href: "/dashboard/tenders", label: "Discover tenders", icon: "search" },
   { href: "/dashboard/saved", label: "Saved tenders", icon: "bookmark" },
-  { href: "/dashboard/amendments", label: "Amendments", icon: "history" },
+  { href: "/dashboard/purchases", label: "My tenders", icon: "checkCircle" },
 ];
 const otherPageNames: Record<string, string> = {
   "/dashboard/settings": "Settings",
@@ -25,10 +25,19 @@ const workspaceNavigation: { href: string; label: string; icon: IconName }[] = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { collapsed, toggleSidebar, profile, savedIds, job, tenders } =
-    useWorkspace();
+  const {
+    collapsed,
+    toggleSidebar,
+    profile,
+    savedIds,
+    job,
+    tenders,
+    purchaseFlow,
+  } = useWorkspace();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const amendedCount = tenders.filter((tender) => tender.amended).length;
+  const purchasedCount = purchaseFlow.orders.filter(
+    (order) => order.status === "purchased",
+  ).length;
   const pageName =
     [...navigation, ...workspaceNavigation].find(
       (item) => item.href === pathname,
@@ -59,12 +68,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {tenders.filter((tender) => savedIds.includes(tender.id)).length}
           </span>
         )}
-        {item.label === "Amendments" && (
-          <span
-            className={`nav-count ${amendedCount ? "nav-count-green" : ""}`}
-          >
-            {amendedCount}
-          </span>
+        {item.label === "My tenders" && (
+          <span className="nav-count">{purchasedCount}</span>
         )}
       </Link>
     );
@@ -191,11 +196,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <AuthProfile />
             <Link
               className="icon-button notification-button"
-              href="/dashboard/amendments"
-              aria-label="View amendments"
+              href="/dashboard/purchases"
+              aria-label="View My tenders"
             >
               <Icon name="bell" size={19} />
-              {amendedCount > 0 && <i />}
+              {purchasedCount > 0 && <i />}
             </Link>
             <Link
               href="/dashboard/profile"

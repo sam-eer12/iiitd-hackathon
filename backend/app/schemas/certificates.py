@@ -34,6 +34,13 @@ class VerificationStartRequest(BaseSchema):
         return self
 
 
+class VerificationRestartRequest(BaseSchema):
+    model_config = ConfigDict(extra="forbid")
+
+    consent: Literal[True]
+    flow: Literal["signin", "signup"] = "signin"
+
+
 class VerificationSummary(BaseSchema):
     id: UUID
     kind: Literal["gst", "pan"]

@@ -78,6 +78,13 @@ export function useCertificateVerification() {
       if (!user) return;
       setState((previous) => {
         if (previous?.owner !== user.uid || !previous.data) return previous;
+        if (
+          record.status === "pending" &&
+          previous.data.verifications.some(
+            (item) => item.id === record.id && item.status === "cancelled",
+          )
+        )
+          return previous;
         return {
           ...previous,
           error: "",
@@ -88,7 +95,7 @@ export function useCertificateVerification() {
               ...previous.data.verifications.filter(
                 (item) => item.id !== record.id,
               ),
-            ],
+            ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
           },
         };
       });
@@ -106,6 +113,39 @@ export function useCertificateVerification() {
       return record;
     },
     [remember, request],
+  );
+
+  const restart = useCallback(
+    async (id: string, flow: "signin" | "signup") => {
+      const response = await request<StartVerificationResponse>(
+        `/${id}/restart`,
+        {
+          method: "POST",
+          body: JSON.stringify({ consent: true, flow }),
+        },
+      );
+      remember(response.verification);
+      setState((previous) => {
+        if (previous?.owner !== user?.uid || !previous?.data) return previous;
+        return {
+          ...previous,
+          data: {
+            ...previous.data,
+            verifications: previous.data.verifications.map((record) =>
+              record.id === id
+                ? {
+                    ...record,
+                    status: "cancelled",
+                    message: "Session stopped. OAuth restarted.",
+                  }
+                : record,
+            ),
+          },
+        };
+      });
+      return response;
+    },
+    [remember, request, user],
   );
 
   const pending = records
@@ -161,6 +201,7 @@ export function useCertificateVerification() {
     signInWithGoogle,
     refresh,
     check,
+    restart,
     start,
   };
 }

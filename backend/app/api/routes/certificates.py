@@ -3,7 +3,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends
@@ -34,6 +34,7 @@ from app.models.certificates import CertificateVerification
 from app.models.models import Workspace
 from app.schemas.certificates import (
     VerificationListResponse,
+    VerificationRestartRequest,
     VerificationStartRequest,
     VerificationStartResponse,
     VerificationSummary,
@@ -187,7 +188,13 @@ async def start_verification(
         provider_id, authorization_url = await client.initiate(
             row.provider, callback, int(row.expires_at.timestamp() * 1000), payload.flow
         )
-    except AppError:
+    except AppError as exc:
+        if exc.code in {"VERIFICATION_NOT_CONFIGURED", "SANDBOX_AUTHENTICATION_FAILED"}:
+            # Authentication/configuration failed before a consent request was sent.
+            row.status = "failed"
+            row.message = exc.message
+            await db.commit()
+            raise
         # A timeout may follow a successful upstream submission. Do not blindly resubmit.
         row.status = "submission_unknown"
         row.message = "The consent session could not be confirmed. An operator must reconcile it before another submission."
@@ -200,6 +207,57 @@ async def start_verification(
     return VerificationStartResponse(
         verification=public_verification(row), authorization_url=authorization_url
     )
+
+
+@router.post(
+    "/{verification_id}/restart", response_model=VerificationStartResponse, status_code=201
+)
+async def restart_verification(
+    verification_id: UUID,
+    payload: VerificationRestartRequest,
+    ctx: AuthenticatedContext = Depends(get_authenticated_context),
+    db: AsyncSession = Depends(get_db),
+):
+    require_live_principal(ctx)
+    # Match the start endpoint's lock order and serialize competing restarts.
+    await db.execute(
+        sa.select(Workspace.id).where(Workspace.id == ctx.workspace_id).with_for_update()
+    )
+    row = (
+        await db.execute(
+            sa.select(CertificateVerification)
+            .where(
+                CertificateVerification.id == verification_id,
+                CertificateVerification.workspace_id == ctx.workspace_id,
+                CertificateVerification.user_id == ctx.user_id,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("Verification session not found.")
+    if row.status not in {"pending", "failed", "expired", "review"}:
+        raise ConflictError(
+            "VERIFICATION_CANNOT_RESTART",
+            "This session has already ended or its submission is unconfirmed. Refresh the verification list before continuing.",
+        )
+    replacement = VerificationStartRequest(
+        kind=row.kind,
+        subject_name=row.subject_name,
+        document_number=row.document_number,
+        consent=payload.consent,
+        request_key=uuid4(),
+        flow=payload.flow,
+    )
+    # Stop tracking this session locally. Sandbox does not document a revocation API;
+    # a late callback or poll for this row can no longer award verification.
+    row.status = "cancelled"
+    row.message = "Session stopped. A new document-consent session was requested."
+    row.expires_at = datetime.now(UTC)
+    await db.flush()
+    # Cancellation and the replacement reservation commit together. Configuration,
+    # quota, and pre-submission errors roll back the cancellation automatically.
+    return await start_verification(replacement, ctx, db)
 
 
 @router.post("/{verification_id}/check", response_model=VerificationSummary)
@@ -269,13 +327,13 @@ async def check_verification(
             or document_type not in consented
         ):
             raise CertificateCheckError("Consent for the required document could not be confirmed.")
-        content = await client.document(row.provider, row.provider_session_id, document_type)
         certificate_path = signing_certificate_path(get_settings(), row.provider)
         if not certificate_path:
             raise CertificateCheckError(
                 "The trusted issuer signing certificate is not configured for this document type."
             )
         signing_certificate = Path(certificate_path).read_bytes()
+        content = await client.document(row.provider, row.provider_session_id, document_type)
         evidence = await asyncio.to_thread(
             verify_issued_certificate,
             content,

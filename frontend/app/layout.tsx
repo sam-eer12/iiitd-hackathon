@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: "%s · TenderLens",
   },
   description:
-    "A clearer view of your next opportunity. Discover relevant tenders, check your readiness, and keep every amendment in sight.",
+    "Find official tenders with TinyFish, review the documents and complete a hackathon demo checkout. Google sign-in and DigiLocker stay connected to your supplier profile.",
 };
 
 export const viewport: Viewport = {

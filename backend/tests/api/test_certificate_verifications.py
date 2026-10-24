@@ -162,6 +162,30 @@ async def test_personal_pan_receipt_does_not_verify_business_gst(verification_en
 
 
 @pytest.mark.asyncio
+async def test_missing_issuer_certificate_allows_consent_but_never_verifies(
+    verification_environment,
+):
+    settings, provider, _, _ = verification_environment
+    settings.DIGILOCKER_SIGNING_CERTIFICATE_PATH = None
+    provider.consented = ["pan"]
+    provider.document_bytes = provider.pan_document
+    payload = {
+        **request_body(),
+        "kind": "pan",
+        "subjectName": "Example Person",
+        "documentNumber": "ABCDE1234F",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        started = await client.post("/api/v1/certificate-verifications", json=payload)
+        assert started.status_code == 201
+        checked = await client.post(
+            f"/api/v1/certificate-verifications/{started.json()['verification']['id']}/check"
+        )
+        assert checked.json()["status"] == "review"
+        assert "signing certificate" in checked.json()["message"]
+
+
+@pytest.mark.asyncio
 async def test_other_workspace_cannot_access_or_complete_session(verification_environment):
     _, _, holder, contexts = verification_environment
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -238,3 +262,64 @@ async def test_client_cannot_claim_verified_profile_provenance(verification_envi
 async def test_unsigned_document_session_request_is_rejected():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         assert (await client.get("/api/v1/certificate-verifications")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_restart_stops_old_session_and_returns_fresh_oauth(verification_environment):
+    _, provider, _, _ = verification_environment
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        started = await client.post("/api/v1/certificate-verifications", json=request_body())
+        old_id = started.json()["verification"]["id"]
+        restarted = await client.post(
+            f"/api/v1/certificate-verifications/{old_id}/restart",
+            json={"consent": True, "flow": "signin"},
+        )
+        assert restarted.status_code == 201
+        assert restarted.json()["authorizationUrl"].startswith("https://entity.digilocker.gov.in/")
+        assert restarted.json()["verification"]["id"] != old_id
+        assert restarted.json()["verification"]["status"] == "pending"
+        assert provider.calls == 2
+        old_check = await client.post(f"/api/v1/certificate-verifications/{old_id}/check")
+        assert old_check.json()["status"] == "cancelled"
+        duplicate = await client.post(
+            f"/api/v1/certificate-verifications/{old_id}/restart", json={"consent": True}
+        )
+        assert duplicate.status_code == 409
+        assert provider.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_other_workspace_cannot_restart_a_session(verification_environment):
+    _, provider, holder, contexts = verification_environment
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        started = await client.post("/api/v1/certificate-verifications", json=request_body())
+        holder["context"] = contexts[1]
+        restarted = await client.post(
+            f"/api/v1/certificate-verifications/{started.json()['verification']['id']}/restart",
+            json={"consent": True},
+        )
+        assert restarted.status_code == 404
+        assert provider.calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["verified", "submitting", "submission_unknown"])
+async def test_restart_does_not_resubmit_completed_or_unknown_sessions(
+    verification_environment, status
+):
+    _, provider, _, _ = verification_environment
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        started = await client.post("/api/v1/certificate-verifications", json=request_body())
+        session_id = uuid.UUID(started.json()["verification"]["id"])
+        async with async_session_factory() as db:
+            await db.execute(
+                sa.update(CertificateVerification)
+                .where(CertificateVerification.id == session_id)
+                .values(status=status)
+            )
+            await db.commit()
+        restarted = await client.post(
+            f"/api/v1/certificate-verifications/{session_id}/restart", json={"consent": True}
+        )
+        assert restarted.status_code == 409
+        assert provider.calls == 1

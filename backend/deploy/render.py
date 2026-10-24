@@ -275,6 +275,31 @@ def data():
                             "kms:DescribeKey",
                         ],
                         "*",
+                        Principal={
+                            "AWS": S(
+                                "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+                            )
+                        },
+                    ),
+                    statement(
+                        ["kms:CreateGrant"],
+                        "*",
+                        Principal={
+                            "AWS": S(
+                                "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+                            )
+                        },
+                        Condition={"Bool": {"kms:GrantIsForAWSResource": True}},
+                    ),
+                    statement(
+                        [
+                            "kms:Encrypt",
+                            "kms:Decrypt",
+                            "kms:ReEncrypt*",
+                            "kms:GenerateDataKey*",
+                            "kms:DescribeKey",
+                        ],
+                        "*",
                         Principal={"Service": S("logs.${AWS::Region}.amazonaws.com")},
                         Condition={
                             "ArnLike": {

@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 import httpx
@@ -5,6 +6,7 @@ import pytest
 import respx
 from pydantic import SecretStr, ValidationError
 
+from app.cli.digilocker_callback import callback_handler
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.domain.certificates import (
@@ -206,3 +208,57 @@ async def test_provider_authentication_errors_do_not_disclose_credentials(tmp_pa
         with pytest.raises(AppError) as error:
             await SandboxClient(settings).session_status("entitylocker", "session")
     assert "secret_test_fixture" not in error.value.message
+
+
+@pytest.mark.asyncio
+async def test_digilocker_consent_can_start_without_issuer_certificate():
+    settings = Settings(
+        _env_file=None,
+        SANDBOX_API_KEY=SecretStr("key_test_fixture"),
+        SANDBOX_API_SECRET=SecretStr("secret_test_fixture"),
+        SANDBOX_RETURN_URL="https://example.test/callback",
+    )
+    assert configuration_ready(settings, "digilocker")
+    with respx.mock as mock:
+        mock.post("https://test-api.sandbox.co.in/authenticate").respond(
+            200, json={"code": 200, "data": {"access_token": "provider-test-token"}}
+        )
+        session = mock.post("https://test-api.sandbox.co.in/kyc/digilocker/sessions/init").respond(
+            200,
+            json={
+                "code": 200,
+                "data": {
+                    "session_id": "00000000-0000-4000-8000-000000000001",
+                    "authorization_url": "https://digilocker.meripehchaan.gov.in/public/oauth2/1/authorize",
+                },
+            },
+        )
+        session_id, url = await SandboxClient(settings).initiate(
+            "digilocker", settings.SANDBOX_RETURN_URL, 2000000000000, "signin"
+        )
+    assert session_id == "00000000-0000-4000-8000-000000000001"
+    assert url.startswith("https://digilocker.meripehchaan.gov.in/")
+    payload = json.loads(session.calls[0].request.content)
+    assert payload["doc_types"] == ["pan"]
+    assert payload["consent_expiry"] == 2000000000000
+
+
+@pytest.mark.parametrize(
+    "url", ["", "http://localhost:3000/profile", "https://user:pass@example.test/profile"]
+)
+def test_digilocker_consent_requires_https_callback(url):
+    settings = Settings(
+        _env_file=None,
+        SANDBOX_API_KEY=SecretStr("key_test_fixture"),
+        SANDBOX_API_SECRET=SecretStr("secret_test_fixture"),
+        SANDBOX_RETURN_URL=url,
+    )
+    assert not configuration_ready(settings, "digilocker")
+
+
+@pytest.mark.parametrize(
+    "url", ["http://attacker.test/profile", "http://user:pass@localhost/profile"]
+)
+def test_demo_callback_cannot_redirect_to_an_arbitrary_host(url):
+    with pytest.raises(ValueError):
+        callback_handler(url)

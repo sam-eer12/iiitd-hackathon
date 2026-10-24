@@ -2,6 +2,8 @@
 
 TenderLens backend API and durable processing worker built with FastAPI, PostgreSQL 17/18 (`tenderlens_api` schema), SQLAlchemy 2 (asyncio), Alembic, PyMuPDF, and TinyFish integration.
 
+The current supplier product flow is [Google sign-in → profile → DigiLocker → TinyFish → review → demo checkout → receipt](../docs/IMPLEMENTATION_PLAN.md). Existing document/rule modules are retained for future work. The new `demo_purchases` table records simulated purchases only, with a server-owned ₹499 demo amount and no real payment provider.
+
 ## Architecture Highlights
 
 - **Identity & Workspace Isolation:** Firebase Authentication ID token verification with workspace scoping; User A cannot access User B's profiles, bookmarks, jobs, or evidence.
@@ -24,7 +26,7 @@ cp .env.example .env
 
 ### 2. Database Migrations
 
-Apply Alembic migrations to create the `tenderlens_api` schema and all 21 tables:
+Apply Alembic migrations to create/update the `tenderlens_api` schema, including revision `b23d9e6f8a01` for demo purchases:
 
 ```bash
 uv run alembic upgrade head
@@ -62,7 +64,7 @@ uv run python -m app.worker
 
 ### Run Test Suite
 
-Run the full pytest suite (26 unit and API integration tests):
+Run the pytest suite (API integration tests require PostgreSQL):
 
 ```bash
 uv run pytest -v
@@ -90,6 +92,9 @@ uv run ruff format --check .
 | `GET /healthz`, `GET /readyz` | Liveness and database/storage readiness probes |
 | `PUT /api/v1/me`, `GET /api/v1/me` | Provision and retrieve authenticated user and workspace |
 | `GET /api/v1/profile`, `PUT /api/v1/profile` | Read and version-update supplier profile with optimistic lock |
+| `GET /api/v1/demo-purchases`, `POST /api/v1/demo-purchases` | List or start/resume account-scoped demo purchases |
+| `GET /api/v1/demo-purchases/{id}` | Retrieve an ownership-checked demo order/receipt |
+| `POST /api/v1/demo-purchases/{id}/pay` | Simulate success/failure; successful receipts are immutable on retry |
 | `GET /api/v1/bookmarks` | List bookmarked tenders |
 | `PUT /api/v1/bookmarks/{tender_id}` | Save tender to bookmarks |
 | `DELETE /api/v1/bookmarks/{tender_id}` | Remove saved tender from bookmarks |
