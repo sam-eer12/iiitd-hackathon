@@ -37,6 +37,8 @@ const paths = {
   mail: "M3 5h18v14H3zM3 5l9 8 9-8",
   minus: "M5 12h14",
   plus: "M5 12h14m-7-7v14",
+  pause: "M9 5v14M15 5v14",
+  play: "m8 5 11 7-11 7V5Z",
 } as const;
 
 export type IconName = keyof typeof paths;

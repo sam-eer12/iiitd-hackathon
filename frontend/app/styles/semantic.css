@@ -1,0 +1,45 @@
+/* Readiness status colors and other shared pieces whose color carries meaning.
+   Loaded after the area styles so these always win. */
+
+/* Readiness: Meets / Review needed / Blocked.
+   Used by badges and by the round icons in the tender review panel. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-meets {
+  color: var(--meets);
+  background: var(--meets-bg);
+  border-color: var(--meets-border);
+}
+.status-review {
+  color: var(--review);
+  background: var(--review-bg);
+  border-color: var(--review-border);
+}
+.status-blocked {
+  color: var(--blocked);
+  background: var(--blocked-bg);
+  border-color: var(--blocked-border);
+}
+
+/* Amendment marker (landing preview and amendments page) */
+.amendment-icon {
+  display: grid;
+  place-items: center;
+  width: 37px;
+  height: 37px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid var(--review-border);
+  background: var(--review-bg);
+  color: var(--review);
+}
