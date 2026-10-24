@@ -33,7 +33,7 @@
 - ESLint and TypeScript checks passed.
 - Seventeen behavior tests passed: missing financial years, unknown versus absent certificates, zero funding, evidence requirements, deadline boundaries, incomplete coverage, aggregate status precedence, live result schema checks, no-match semantics, duplicate limits, and source URL restrictions.
 - Production build generated the landing, dashboard routes, architecture page, sample documents, and dynamic discovery routes.
-- HTTP smoke checks cover page content and API configuration, cross-origin submission rejection, and signed job access.
+- HTTP smoke checks cover page content and API configuration, cross-origin submission rejection, signed job access, and not-found content with a noindex marker. Next.js may send HTTP 200 for a not-found page after streaming begins, so the check verifies the rendered error state as well as the allowed status.
 - Mermaid grammar was checked with the installed Mermaid parser; a sanitizer stub was used only for the server-side syntax check because the parser normally expects a browser DOM. The application uses Mermaid's strict security mode.
 - Browser visual/interaction review was unavailable because the computer-use runtime reported no connected browsers. Responsive styles and interaction handlers are implemented, but an actual desktop/mobile browser review remains to be done.
 

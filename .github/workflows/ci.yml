@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  quality:
+    name: Lint, types, tests, and formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Generate route types and check TypeScript
+        run: npm run typecheck
+
+      - name: Run behavior tests
+        run: npm test
+
+      - name: Check formatting
+        run: npm run format:check
+
+  production:
+    name: Production build and HTTP smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder-key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-tenderlens.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-tenderlens
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-tenderlens.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1234567890"
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:1234567890:web:ci-placeholder"
+      NEXT_PUBLIC_USE_FIREBASE_EMULATOR: "true"
+      TINYFISH_API_KEY: ""
+      DISCOVERY_ACCESS_TOKEN: ""
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Start production server and run smoke tests
+        shell: bash
+        run: |
+          server_log="$RUNNER_TEMP/tenderlens-server.log"
+          npm run start -- --hostname 127.0.0.1 --port 3000 > "$server_log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000 > /dev/null; then
+              npm run smoke
+              exit 0
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$server_log"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          cat "$server_log"
+          echo "Production server did not become ready within 60 seconds."
+          exit 1
