@@ -19,6 +19,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Icon } from "./icon";
+import { INITIAL_TENDER_CATALOG } from "@/lib/tender-catalog";
 
 /* Orbit path (px, relative to the document's center). The document is
    420 x 482 with its text inset 24px at the sides and 20px at the bottom;
@@ -175,6 +176,7 @@ function OrbitCard({
 }
 
 export function HeroPreview() {
+  const tender = INITIAL_TENDER_CATALOG.tenders[0];
   const wide = useSyncExternalStore(subscribeToWidth, isWide, isWideOnServer);
   const reduceMotion = useReducedMotion();
   const orbiting = wide && !reduceMotion;
@@ -251,10 +253,12 @@ export function HeroPreview() {
         <Icon name="history" size={18} />
       </span>
       <div>
-        <strong>A change. Already in sight.</strong>
-        <p>Closing date extended by 7 days</p>
+        <strong>The source. Within reach.</strong>
+        <p>Read the original tender document</p>
         <span>
-          30 Oct <Icon name="arrowRight" size={12} /> <b>06 Nov</b>
+          <a href={tender.pdfUrls[0]} target="_blank" rel="noreferrer">
+            Open source PDF <Icon name="arrow" size={12} />
+          </a>
         </span>
       </div>
     </div>
@@ -262,11 +266,11 @@ export function HeroPreview() {
   const readiness = (
     <div className="preview-readiness">
       <span className="readiness-check">
-        <Icon name="check" size={18} />
+        <Icon name="clock" size={18} />
       </span>
       <div>
-        <strong>Looks like a good fit.</strong>
-        <small>All 5 checked conditions meet</small>
+        <strong>Ready for your review.</strong>
+        <small>PDF clause verification pending</small>
       </div>
     </div>
   );
@@ -275,7 +279,7 @@ export function HeroPreview() {
     <figure
       ref={stage}
       className={`hero-product reveal reveal-5 ${orbiting ? "is-orbiting" : ""}`}
-      aria-label="Illustrative TenderLens readiness preview"
+      aria-label="Real IIIT-Delhi tender collected by TinyFish"
       onPointerEnter={(event) => {
         if (event.pointerType !== "mouse") return;
         hovered.current = true;
@@ -326,38 +330,38 @@ export function HeroPreview() {
             <span className="institution-symbol">II</span> INSTITUTIONAL
             PROCUREMENT
           </div>
-          <h3>Supply & installation of digital oscilloscopes</h3>
+          <h3>{tender.title}</h3>
           <div className="preview-tags">
-            <span>Electronics</span>
-            <span>Open tender</span>
+            <span>IIIT-Delhi</span>
+            <span>Official notice</span>
           </div>
           <div className="preview-facts">
             <div>
               <small>Estimated value</small>
-              <strong>₹12.5 lakh</strong>
+              <strong>{tender.value}</strong>
             </div>
             <div>
               <small>Closing date</small>
-              <strong>06 Nov 2026</strong>
+              <strong>{tender.deadlineText}</strong>
             </div>
           </div>
           <div className="preview-condition">
-            <Icon name="checkCircle" size={16} />
+            <Icon name="clock" size={16} />
             <span>Turnover requirement</span>
-            <b>Meets</b>
+            <b>Review</b>
           </div>
           <div className="preview-condition">
-            <Icon name="checkCircle" size={16} />
+            <Icon name="clock" size={16} />
             <span>Past experience</span>
-            <b>Meets</b>
+            <b>Review</b>
           </div>
           <div className="preview-condition">
-            <Icon name="checkCircle" size={16} />
+            <Icon name="clock" size={16} />
             <span>Required certificates</span>
-            <b>Meets</b>
+            <b>Review</b>
           </div>
           <div className="preview-source">
-            <Icon name="link" size={13} /> Every check, linked to its source.
+            <Icon name="link" size={13} /> Official tender PDF linked.
           </div>
         </motion.div>
         {orbiting ? (
@@ -377,7 +381,7 @@ export function HeroPreview() {
         )}
       </div>
       <figcaption className="preview-sample">
-        Illustrative sample · always verify the source
+        Real notice · TinyFish source snapshot
         {orbiting && (
           <button
             type="button"

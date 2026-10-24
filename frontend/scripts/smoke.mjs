@@ -8,7 +8,7 @@ const pages = [
   ["/dashboard/saved", "Your saved shortlist"],
   ["/dashboard/profile", "Your business, in focus."],
   ["/dashboard/sources", "IIIT-Delhi"],
-  ["/dashboard/amendments", "Submission deadline extended"],
+  ["/dashboard/amendments", "No amendment links in this discovery."],
   ["/dashboard/settings", "Your workspace, your way."],
   ["/dashboard/help", "Find your feet."],
   ["/architecture", "From opportunity"],
@@ -31,6 +31,18 @@ const configuration = await configurationResponse.json();
 assert.equal(typeof configuration.configured, "boolean");
 assert.equal(typeof configuration.tokenRequired, "boolean");
 console.log("Discovery configuration:", configuration);
+
+const catalogResponse = await fetch(`${base}/api/tenders`);
+assert.equal(catalogResponse.status, 200);
+const catalog = await catalogResponse.json();
+assert.ok(Array.isArray(catalog.tenders));
+assert.ok(Number.isFinite(Date.parse(catalog.retrievedAt)));
+for (const tender of catalog.tenders) {
+  assert.equal(tender.provenance, "live");
+  assert.equal(new URL(tender.sourceUrl).hostname, "iiitd.ac.in");
+  assert.deepEqual(tender.conditions, []);
+}
+console.log(`Public source catalog: ${catalog.tenders.length} real notices`);
 
 const crossOrigin = await fetch(`${base}/api/discovery`, {
   method: "POST",

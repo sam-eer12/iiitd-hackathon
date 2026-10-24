@@ -20,7 +20,8 @@ export default function HelpPage() {
           <p>
             Add your annual turnover, completed supply orders, available deposit
             funds, and certificate status. Leave unknown facts blank. Saving a
-            profile immediately updates the sample readiness checks.
+            profile updates supported readiness checks when verified
+            requirements are available.
           </p>
           <Link className="text-link" href="/dashboard/profile">
             Open supplier profile <Icon name="arrowRight" size={15} />
@@ -43,10 +44,9 @@ export default function HelpPage() {
           <Icon name="document" size={25} />
           <h2>Open the evidence.</h2>
           <p>
-            Select a tender, expand a readiness check, and follow its clause
-            reference. Sample documents are synthetic and labelled. Live
-            discovery provides source links; its PDF clause processing is still
-            pending.
+            Select a tender and open Source evidence to view the official
+            documents collected by TinyFish. Readiness stays Review needed until
+            the source clauses are extracted and verified.
           </p>
           <Link className="text-link" href="/dashboard/tenders">
             Discover tenders <Icon name="arrowRight" size={15} />

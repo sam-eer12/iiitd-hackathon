@@ -165,7 +165,8 @@ function ProfileForm({
               }
             />
             <small>
-              Used for simple order-count checks in the sample workspace.
+              Used for order-count checks when verified tender requirements are
+              available.
             </small>
           </label>
         </div>
@@ -225,7 +226,7 @@ function ProfileForm({
           <Icon name={dirty ? "alert" : "shield"} size={16} />
           {dirty
             ? "You have unsaved changes."
-            : "Stored in this browser. Use sample business facts."}
+            : "Stored in this browser. Enter your current business facts."}
         </span>
         <div className="form-footer-actions">
           {dirty && (
