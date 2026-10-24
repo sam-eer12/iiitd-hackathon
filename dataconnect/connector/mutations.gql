@@ -1,0 +1,46 @@
+mutation UpsertUser($email: String!, $displayName: String, $photoUrl: String) @auth(level: USER) {
+  user_upsert(data: {
+    uid_expr: "auth.uid",
+    email: $email,
+    displayName: $displayName,
+    photoUrl: $photoUrl
+  })
+}
+
+mutation CreateSupplierProfile(
+  $companyName: String!,
+  $categories: [String!]!,
+  $turnoverLakhs: Float,
+  $turnoverYears: Int,
+  $maxEmdCapacityLakhs: Float
+) @auth(level: USER) {
+  supplierProfile_insert(data: {
+    owner: { uid_expr: "auth.uid" },
+    companyName: $companyName,
+    categories: $categories,
+    turnoverLakhs: $turnoverLakhs,
+    turnoverYears: $turnoverYears,
+    maxEmdCapacityLakhs: $maxEmdCapacityLakhs
+  })
+}
+
+mutation SaveTender(
+  $tenderRef: String!,
+  $title: String!,
+  $sourceUrl: String,
+  $closingDate: String,
+  $readinessStatus: String
+) @auth(level: USER) {
+  savedTender_insert(data: {
+    owner: { uid_expr: "auth.uid" },
+    tenderRef: $tenderRef,
+    title: $title,
+    sourceUrl: $sourceUrl,
+    closingDate: $closingDate,
+    readinessStatus: $readinessStatus
+  })
+}
+
+mutation DeleteSavedTender($id: UUID!) @auth(level: USER) {
+  savedTender_delete(id: $id)
+}
