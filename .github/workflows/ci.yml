@@ -16,6 +16,70 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
+  backend-quality:
+    name: Backend Lint, Migrations, Tests, and Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tenderlens
+          POSTGRES_PASSWORD: tenderlens_dev
+          POSTGRES_DB: tenderlens
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.21"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint and format check
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://tenderlens:tenderlens_dev@localhost:5432/tenderlens
+        run: uv run alembic upgrade head
+
+      - name: Seed database
+        env:
+          DATABASE_URL: postgresql+asyncpg://tenderlens:tenderlens_dev@localhost:5432/tenderlens
+        run: uv run python -m app.cli.seed
+
+      - name: Run test suite
+        env:
+          DATABASE_URL: postgresql+asyncpg://tenderlens:tenderlens_dev@localhost:5432/tenderlens
+          APP_ENV: test
+        run: uv run pytest -v
+
+      - name: Run 10-notice benchmark
+        run: uv run python -m app.cli.benchmark
+
   quality:
     name: Lint, types, tests, and formatting
     runs-on: ubuntu-latest
