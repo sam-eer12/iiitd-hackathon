@@ -3,10 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icon";
+import { AuthProfile } from "@/components/auth-profile";
 import { useWorkspace } from "@/components/workspace-provider";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
   const { collapsed, toggleSidebar, clearLiveResults, job } = useWorkspace();
+  const { user, loading } = useAuth();
   const [confirm, setConfirm] = useState(false);
   const running = !!job && ["running", "submitting"].includes(job.status);
   return (
@@ -21,6 +24,19 @@ export default function SettingsPage() {
       <section className="settings-panel">
         <div className="settings-row">
           <div>
+            <h2>Account</h2>
+            <p>
+              {loading
+                ? "Checking your sign-in status…"
+                : user
+                  ? `Signed in as ${user.email ?? user.displayName ?? "your Google account"}. Your supplier profile and bookmarks are stored in this browser.`
+                  : "Sign in with Google to identify this workspace. Your supplier profile and bookmarks are stored in this browser either way."}
+            </p>
+          </div>
+          <AuthProfile />
+        </div>
+        <div className="settings-row">
+          <div>
             <h2>Navigation sidebar</h2>
             <p>
               Keep the sidebar open for labels, or collapse it to give your
@@ -28,7 +44,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <button
-            className="button button-outline button-small"
+            className="button button-secondary button-small"
             onClick={toggleSidebar}
           >
             <Icon name="panel" size={15} />
@@ -44,7 +60,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <Link
-            className="button button-outline button-small"
+            className="button button-secondary button-small"
             href="/dashboard/sources"
           >
             Manage source <Icon name="arrowRight" size={15} />
@@ -59,18 +75,29 @@ export default function SettingsPage() {
               The server’s run history is retained.
             </p>
           </div>
-          <button
-            className="button button-outline button-small"
-            disabled={running}
-            onClick={() => {
-              if (confirm) {
-                clearLiveResults();
-                setConfirm(false);
-              } else setConfirm(true);
-            }}
-          >
-            {confirm ? "Confirm sample view" : "Show sample data"}
-          </button>
+          <div className="settings-actions">
+            {confirm && (
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                onClick={() => setConfirm(false)}
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              className={`button button-small ${confirm ? "button-primary" : "button-secondary"}`}
+              disabled={running}
+              onClick={() => {
+                if (confirm) {
+                  clearLiveResults();
+                  setConfirm(false);
+                } else setConfirm(true);
+              }}
+            >
+              {confirm ? "Confirm sample view" : "Show sample data"}
+            </button>
+          </div>
         </div>
       </section>
     </>
