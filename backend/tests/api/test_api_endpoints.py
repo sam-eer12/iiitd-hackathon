@@ -1,9 +1,42 @@
 """Integration tests for authenticated API routes and workspace isolation."""
 
+import uuid
+
 import pytest
+import sqlalchemy as sa
 from httpx import ASGITransport, AsyncClient
 
+from app.cli.seed import seed_database
+from app.database import async_session_factory
 from app.main import app
+from app.models.models import Tender
+
+
+@pytest.fixture
+async def catalog_tender():
+    """Provide test notices independently of the source-only production seed."""
+    await seed_database()
+    live_id, sample_id = uuid.uuid4(), uuid.uuid4()
+    async with async_session_factory() as db:
+        for tender_id, provenance in ((live_id, "live"), (sample_id, "sample")):
+            db.add(
+                Tender(
+                    id=tender_id,
+                    source_id="iiitd",
+                    external_reference=f"TEST-{tender_id}",
+                    title=f"API test notice ({provenance})",
+                    issuer="IIIT-Delhi",
+                    source_url="https://iiitd.ac.in/tenders",
+                    provenance=provenance,
+                )
+            )
+        await db.commit()
+    try:
+        yield live_id, sample_id
+    finally:
+        async with async_session_factory() as db:
+            await db.execute(sa.delete(Tender).where(Tender.id.in_([live_id, sample_id])))
+            await db.commit()
 
 
 @pytest.mark.asyncio
@@ -74,7 +107,7 @@ async def test_profile_read_update_and_version_conflict():
 
 
 @pytest.mark.asyncio
-async def test_sources_and_tenders_listing():
+async def test_sources_and_tenders_listing(catalog_tender):
     headers = {"Authorization": "Bearer dev_user_gamma"}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Sources
@@ -89,6 +122,9 @@ async def test_sources_and_tenders_listing():
         assert res_tenders.status_code == 200
         tenders = res_tenders.json()["items"]
         assert len(tenders) >= 1
+        live_id, sample_id = catalog_tender
+        assert str(live_id) in {tender["id"] for tender in tenders}
+        assert str(sample_id) not in {tender["id"] for tender in tenders}
 
         first_tender = tenders[0]
         assert "evaluation" in first_tender
@@ -96,12 +132,10 @@ async def test_sources_and_tenders_listing():
 
 
 @pytest.mark.asyncio
-async def test_bookmarks_lifecycle():
+async def test_bookmarks_lifecycle(catalog_tender):
     headers = {"Authorization": "Bearer dev_user_delta"}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # Get tender ID
-        res_tenders = await client.get("/api/v1/tenders", headers=headers)
-        tender_id = res_tenders.json()["items"][0]["id"]
+        tender_id = str(catalog_tender[0])
 
         # Add bookmark
         res_add = await client.put(f"/api/v1/bookmarks/{tender_id}", headers=headers)
