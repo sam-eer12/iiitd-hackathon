@@ -1,0 +1,5 @@
+.next/
+.next-production/
+.data/
+node_modules/
+lib/dataconnect/
