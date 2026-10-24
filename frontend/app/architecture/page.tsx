@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Brand } from "@/components/brand";
+import { SiteHeader } from "@/components/site-header";
 import { Icon } from "@/components/icon";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
 import { ARCHITECTURE_DIAGRAM } from "@/lib/architecture";
@@ -8,21 +7,16 @@ export const metadata = { title: "Project architecture" };
 export default function ArchitecturePage() {
   return (
     <div className="architecture-page">
-      <header className="landing-nav page-width">
-        <Brand />
-        <Link href="/dashboard" className="button button-dark button-small">
-          Open workspace <Icon name="arrowRight" size={15} />
-        </Link>
-      </header>
+      <SiteHeader />
       <main className="page-width">
         <div className="architecture-heading">
-          <div className="eyebrow">THE WHOLE PICTURE</div>
-          <h1>
+          <div className="eyebrow reveal">The whole picture</div>
+          <h1 className="reveal reveal-1">
             From opportunity
             <br />
-            to evidence. Connected.
+            to evidence. <span className="serif-accent">Connected.</span>
           </h1>
-          <p>
+          <p className="reveal reveal-2">
             The complete TenderLens target architecture, generated with Mermaid
             Charts. The current build includes the landing page, interactive
             dashboard, browser-persisted sample workspace, deterministic sample
@@ -31,7 +25,7 @@ export default function ArchitecturePage() {
             are planned.
           </p>
         </div>
-        <div className="architecture-summary">
+        <div className="architecture-summary reveal reveal-3">
           {[
             {
               number: "01 / EXPERIENCE",
@@ -61,6 +55,10 @@ export default function ArchitecturePage() {
             </section>
           ))}
         </div>
+        <p className="architecture-scroll-hint">
+          <Icon name="arrowRight" size={14} /> Scroll sideways to see the full
+          diagram.
+        </p>
         <ArchitectureDiagram diagram={ARCHITECTURE_DIAGRAM} />
         <div className="architecture-caption">
           <span>

@@ -1,9 +1,24 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SAMPLE_TENDERS } from "@/lib/demo-data";
+import Link from "next/link";
 import { Brand } from "@/components/brand";
+import { Icon } from "@/components/icon";
 
 export function generateStaticParams() {
   return SAMPLE_TENDERS.map((tender) => ({ id: tender.id }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const tender = SAMPLE_TENDERS.find((item) => item.id === id);
+  return {
+    title: tender ? `${tender.title} · Sample document` : "Sample document",
+  };
 }
 
 export default async function SampleDocumentPage({
@@ -16,7 +31,17 @@ export default async function SampleDocumentPage({
   if (!tender) notFound();
   return (
     <main className="sample-document">
-      <Brand />
+      <div className="sample-document-top">
+        <Brand />
+        <Link className="text-link" href="/dashboard/tenders">
+          <Icon
+            name="arrowRight"
+            size={14}
+            style={{ transform: "rotate(180deg)" }}
+          />
+          Back to tenders
+        </Link>
+      </div>
       <h1>{tender.title}</h1>
       <div className="inline-notice">
         Illustrative sample document. These clauses and page references are
