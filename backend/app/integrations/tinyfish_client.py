@@ -8,6 +8,7 @@ import httpx
 from app.core.config import get_settings
 from app.core.errors import AppError, ServiceUnavailableError
 from app.core.logging import get_logger
+from app.sources.iiitd import START_URL
 
 logger = get_logger(__name__)
 
@@ -113,9 +114,11 @@ class TinyFishClient:
             "Content-Type": "application/json",
         }
         payload = {
-            "goal": goal,
-            "schema": TINYFISH_DISCOVERY_SCHEMA,
-            "metadata": {"correlation_marker": correlation_marker},
+            "url": START_URL,
+            "goal": f"{goal} Correlation marker: {correlation_marker}",
+            "browser_profile": "lite",
+            "output_schema": TINYFISH_DISCOVERY_SCHEMA,
+            "agent_config": {"max_duration_seconds": self.settings.TINYFISH_MAX_DURATION_SECONDS},
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:

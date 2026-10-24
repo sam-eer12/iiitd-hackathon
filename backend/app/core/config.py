@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     TINYFISH_API_KEY: str | None = None
     TINYFISH_BASE_URL: str = "https://agent.tinyfish.ai"
-    TINYFISH_MODE: Literal["fixture", "live"] = "fixture"
+    TINYFISH_MODE: Literal["fixture", "live"] = "live"
 
     MAX_PROVIDER_CONCURRENCY: int = 1
     TINYFISH_MAX_DURATION_SECONDS: int = 300
