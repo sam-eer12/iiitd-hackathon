@@ -904,30 +904,49 @@
                 {
                   "Effect": "Allow",
                   "Action": [
-                    "codeconnections:UseConnection"
+                    "codeconnections:UseConnection",
+                    "codestar-connections:UseConnection"
                   ],
                   "Resource": {
                     "Ref": "ConnectionArn"
                   },
                   "Condition": {
-                    "StringEquals": {
+                    "StringEqualsIfExists": {
                       "codeconnections:FullRepositoryId": {
                         "Ref": "RepositoryId"
                       },
+                      "codeconnections:BranchName": {
+                        "Ref": "Branch"
+                      },
+                      "codeconnections:ProviderPermissionsRequired": "read_only",
                       "codeconnections:ProviderAction": [
                         "GitPull",
                         "GetBranch",
                         "GetCommit",
                         "GetRepository",
                         "StartUploadArchiveToS3",
-                        "GetUploadArchiveToS3Status"
+                        "GetUploadArchiveToS3Status",
+                        "GetFile",
+                        "GetFolder",
+                        "IsRepositoryEmpty",
+                        "ListBranches",
+                        "ListBranchCommits",
+                        "ListCommitFiles",
+                        "ListCommitStatuses",
+                        "ListRepositories",
+                        "ListOwners",
+                        "GenerateReferenceLink"
                       ]
-                    },
-                    "StringEqualsIfExists": {
-                      "codeconnections:BranchName": {
-                        "Ref": "Branch"
-                      }
                     }
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codeconnections:GetConnection"
+                  ],
+                  "Resource": {
+                    "Ref": "ConnectionArn"
                   }
                 },
                 {

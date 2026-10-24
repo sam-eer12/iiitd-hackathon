@@ -881,11 +881,13 @@ fi
                 R("DataKeyArn"),
             ),
             statement(
-                ["codeconnections:UseConnection"],
+                ["codeconnections:UseConnection", "codestar-connections:UseConnection"],
                 R("ConnectionArn"),
                 Condition={
-                    "StringEquals": {
+                    "StringEqualsIfExists": {
                         "codeconnections:FullRepositoryId": R("RepositoryId"),
+                        "codeconnections:BranchName": R("Branch"),
+                        "codeconnections:ProviderPermissionsRequired": "read_only",
                         "codeconnections:ProviderAction": [
                             "GitPull",
                             "GetBranch",
@@ -893,11 +895,21 @@ fi
                             "GetRepository",
                             "StartUploadArchiveToS3",
                             "GetUploadArchiveToS3Status",
+                            "GetFile",
+                            "GetFolder",
+                            "IsRepositoryEmpty",
+                            "ListBranches",
+                            "ListBranchCommits",
+                            "ListCommitFiles",
+                            "ListCommitStatuses",
+                            "ListRepositories",
+                            "ListOwners",
+                            "GenerateReferenceLink",
                         ],
                     },
-                    "StringEqualsIfExists": {"codeconnections:BranchName": R("Branch")},
                 },
             ),
+            statement(["codeconnections:GetConnection"], R("ConnectionArn")),
             statement(["codebuild:StartBuild", "codebuild:BatchGetBuilds"], A("Build", "Arn")),
             statement(
                 [
