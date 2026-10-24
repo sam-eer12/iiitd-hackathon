@@ -6,9 +6,9 @@
 
 | Area | Current behavior |
 | --- | --- |
-| Landing | Product introduction, sample product preview, how-it-works sections, workspace entry points |
+| Landing | Product introduction with a real TinyFish tender preview, how-it-works sections, workspace entry points |
 | Dashboard | Collapsible sidebar, mobile navigation, persistent shared workspace shell |
-| Tender review | Search, category/readiness filters, sort, saved notices, shortlist JSON export |
+| Tender review | Five real IIIT-Delhi notices collected with TinyFish, official PDFs, original deadlines, search, filters, stable bookmarks, JSON export, and shared latest-successful catalog via `/api/tenders` |
 | Supplier profile | Editable facts, tri-state certificates, exact annual financial periods, optimistic versioning, local browser persistence and backend persistence |
 | Backend API & Architecture | FastAPI application factory, PostgreSQL 17/18 persistence in dedicated `tenderlens_api` schema, Alembic async migrations (21 tables), typed Pydantic v2 schemas with camelCase aliases |
 | Auth & Isolation | Firebase Auth ID token verification, automatic personal workspace provisioning (`/me`), strict workspace isolation for all profiles, bookmarks, jobs, and private uploads |
@@ -18,7 +18,7 @@
 | Durable Worker | Background worker utilizing PostgreSQL `FOR UPDATE SKIP LOCKED` row locking, leases, heartbeats, and provider observation budgets |
 | TinyFish Provider | Server-only adapter supporting both deterministic `fixture` mode and live `POST /v1/automation/run-async` metered runs with cancellation and reconciliation |
 | Local Import | Idempotent `POST /api/v1/imports/local-workspace` migration of browser storage into the persistent backend |
-| CLI & Benchmark | `seed.py` for idempotent setup and `benchmark.py` running the 10-notice evaluation target |
+| CLI & Benchmark | `seed.py` registers official sources without synthetic notices and `benchmark.py` running the 10-notice evaluation target |
 
 ## Verification Summary
 
@@ -34,3 +34,7 @@
 - Production build generated landing, dashboard routes, architecture page, sample documents, and dynamic discovery routes.
 
 See [backend/README.md](../backend/README.md) and root [README.md](../README.md) for local setup and commands.
+
+## Real tender catalog
+
+The dashboard now defaults to the recorded TinyFish result in `frontend/lib/data/iiitd-tenders.json`, collected on 24 October 2026 (provider run `ede19523-9671-401c-adea-a636d424907d`). Refreshes replace the shared catalog only after successful validation. Older sample browser state migrates automatically. Source dates are retained, including recently closed notices. Readiness remains Review needed until clauses are verified. The backend defaults to live discovery and no longer injects hardcoded amounts, clauses, or amendment diffs into provider observations.

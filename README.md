@@ -18,15 +18,15 @@ Open [the landing page](http://localhost:3000), [the dashboard](http://localhost
 
 - Responsive landing page and dashboard with a collapsible desktop sidebar and mobile navigation.
 - Searchable tender list, category/readiness filters, sorting, bookmarks, and JSON shortlist export.
-- Editable supplier profile and deterministic sample checks for turnover, experience, certificates, EMD capacity, and deadline.
-- Evidence drawer, linked synthetic source documents, and illustrative amendment history.
+- Editable supplier profile and conservative readiness labels; real notices stay Review needed until their clauses are verified.
+- Evidence drawer with official tender PDFs, original deadline text, observation timestamps, and collected amendment links.
 - Browser persistence for profile, bookmarks, sidebar preference, and discovery results.
 - Server-only TinyFish async discovery adapter with bounded runs, structured result validation, exact source-host validation, signed job access, and local run records.
 - Complete target architecture rendered with Mermaid in the app and generated through Mermaid Charts.
 
-The default workspace contains **eight synthetic notices** and uses a **24 October 2026 demo clock**. They demonstrate the interface and rules; they are not actual IIIT-Delhi notices. The ten-notice benchmark described in the pitch has not been performed.
+The default workspace contains **five real IIIT-Delhi notices collected with TinyFish on 24 October 2026**. The recorded API result, collection time, and provider run ID are in `frontend/lib/data/iiitd-tenders.json`. The listing includes recently closed notices with their actual deadlines. No tender prices, eligibility clauses, or amendment changes are invented. Synthetic fixtures remain available only for rule tests and explicitly labelled sample-document routes.
 
-Live discovery returns actual source observations and links. Its notices stay **Review needed** because live PDF extraction, condition verification, and amendment comparison are not implemented yet. The proposed FastAPI backend, durable worker, PostgreSQL/S3 persistence, and AWS deployment remain the next implementation phase. Browser storage and local discovery files are a development foundation, not the planned production persistence layer.
+The dashboard loads the latest completed source snapshot from `GET /api/tenders`, falling back to the recorded real snapshot. Completed application runs update the shared catalog; failed refreshes preserve it. Browser storage retains the supplier profile and bookmarks, and stable source identities preserve bookmarks across refreshes. Old sample workspaces migrate to real notices automatically. Live PDF clause verification and amendment comparison remain pending in this dashboard. The separate FastAPI API and worker are in `backend/`; the dashboard currently uses the Next.js discovery routes and local server files.
 
 ## Enable TinyFish discovery
 
@@ -38,7 +38,7 @@ For hosted use, also configure `DISCOVERY_ACCESS_TOKEN` and enter it on Connecte
 
 The current adapter allows only `iiitd.ac.in` and `www.iiitd.ac.in` over HTTPS. A legitimate document on another host needs explicit source-adapter review before it can be accepted.
 
-Run records are stored under the ignored `frontend/.data/discovery/` directory. An interrupted submission can become `submission_unknown`; the app blocks another submission until an operator reconciles the correlation marker/run in TinyFish. Do not clear that record and blindly retry: a metered run may already exist. Polling resumes when the workspace is open; a production background worker is still planned.
+Run records and the latest successful catalog are stored under the ignored `frontend/.data/discovery/` directory. An interrupted submission can become `submission_unknown`; the app blocks another submission until an operator reconciles the correlation marker/run in TinyFish. Do not clear that record and blindly retry: a metered run may already exist. Polling resumes when the workspace is open; a production background worker is still planned.
 
 ## Checks and production build
 

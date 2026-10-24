@@ -30,13 +30,15 @@ Apply Alembic migrations to create the `tenderlens_api` schema and all 21 tables
 uv run alembic upgrade head
 ```
 
-### 3. Seed Sample Data
+### 3. Register Official Sources
 
-Idempotently seed the official sources (e.g. IIIT-Delhi) and demo notices:
+Idempotently register the official sources (e.g. IIIT-Delhi). This command creates no synthetic notices:
 
 ```bash
 uv run python -m app.cli.seed
 ```
+
+The provider defaults to `TINYFISH_MODE=live`. Start an authenticated refresh to collect real notices. `fixture` is an explicit testing option, and fixture observations are labelled as samples. Discovery records preserve source titles, dates, and document links; prices and eligibility conditions remain unresolved until source evidence is processed.
 
 ### 4. Run the API Server
 
